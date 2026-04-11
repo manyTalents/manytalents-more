@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-deep: #080c18;
+  --bg-surface: #0d1120;
+  --text-primary: #f0ebe0;
+  --gold: #c9a84c;
+  --gold-light: #e2c873;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #080c18;
+  color: #f0ebe0;
+}
+
+h1, h2, h3 {
+  font-family: "Playfair Display", Georgia, serif;
+}
+
+/* Gold gradient text helper */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #c9a84c, #e2c873);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #080c18;
+}
+::-webkit-scrollbar-thumb {
+  background: #1a1f32;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #252b42;
+}

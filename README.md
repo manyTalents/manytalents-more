@@ -1,64 +1,91 @@
-# Many Talents More — Landing Page
+# ManyTalents More
 
-Static landing page for the Many Talents product suite:
-- **Many Talents Prep** — test prep app
-- **Many Talents Manager** — field service management (the HCP replacement)
-- **Many Talents Money** — capital allocation / trading tools
+The unified web hub for the ManyTalents product suite. Single repo, single deploy, single domain.
 
-## Files
-- `index.html` — the page
-- `style.css` — brand styling (navy + gold)
-- `README.md` — this file
+**Domain:** `manytalentsmore.com`
 
-No build step, no dependencies. Pure HTML + CSS.
+## Routes
 
-## To Preview Locally
-Just open `index.html` in any browser. Or run a quick local server:
+| Path | Description | Type |
+|------|-------------|------|
+| `/` | Landing page — hero + 3 product cards | React page |
+| `/prep` | ManyTalents Prep marketing page | Static HTML (served from `public/prep/`) |
+| `/manager` | Office dashboard login | React page (auth required) |
+| `/manager/dashboard` | Office Pipeline — 5 workflow cards | React page |
+| `/manager/section/*` | Filtered job lists per workflow stage | React page |
+
+## Stack
+
+- **Next.js 15** (App Router) + TypeScript
+- **Tailwind CSS** (MT brand: navy + gold)
+- **Frappe API** — shares backend with MTM mobile app (`manytalentsmore.v.frappe.cloud`)
+- **Deploy:** Cloudflare Pages → `manytalentsmore.com`
+
+## Development
 
 ```bash
 cd ManyTalentsMore
-python -m http.server 8000
-# Open http://localhost:8000
+npm install
+npm run dev
+# Open http://localhost:3000
 ```
 
-## To Deploy
+Log in to `/manager` with your Frappe API key + secret (same credentials used in the MTM mobile app).
 
-### Option 1: Cloudflare Pages (recommended — free, fast, custom domain)
-1. Create a GitHub repo: `manytalents-more-landing` (or similar)
-2. Push these files to it
-3. Go to dash.cloudflare.com → Pages → Create project → Connect to Git
-4. Select the repo, leave build command blank (it's static)
-5. Deploy. Get a `*.pages.dev` URL instantly.
-6. Add custom domain in Pages settings when ready.
+## Deploy
 
-### Option 2: Vercel (also free)
 1. Push to GitHub
-2. vercel.com → Import project → select repo
-3. Framework preset: **Other**, build command: blank, output: `.`
-4. Deploy
+2. Cloudflare Pages → Create Project → Connect Git → select `manytalents-more`
+3. Framework preset: **Next.js**
+4. Build command: `npm run build`
+5. Output directory: `.next`
+6. Custom domain: `manytalentsmore.com`
 
-### Option 3: GitHub Pages
-1. Push to GitHub
-2. Settings → Pages → Source: main branch, root directory
-3. URL: `username.github.io/repo-name`
+## Environment Variables
 
-## What to Edit
+- `NEXT_PUBLIC_FRAPPE_SITE` — Frappe site URL (default: `https://manytalentsmore.v.frappe.cloud`)
 
-- **Card links:** The three `<a href="#">` in `index.html` — point each to the actual app URLs
-  - Prep: eventually `https://prep.manytalents.more` or similar
-  - Manager: `https://app.manytalents.more` or `https://manytalentsmore.v.frappe.cloud`
-  - Money: TBD
-- **Product taglines and descriptions:** tweak to match final positioning
-- **Colors:** edit `:root` variables in `style.css` (currently navy #0D2137 + gold #F5D623)
-- **Favicon:** currently a bolt emoji — replace with a real logo SVG
+## Project Structure
 
-## Domain Ideas
-- `manytalents.more` (if the .more TLD is available — check)
-- `manytalentsmore.com`
-- `mtm.tools`
-- `parabletoolkit.com`
+```
+ManyTalentsMore/
+├── src/
+│   ├── app/
+│   │   ├── page.tsx              → / (landing hub)
+│   │   ├── manager/
+│   │   │   ├── page.tsx          → /manager (login)
+│   │   │   ├── dashboard/
+│   │   │   │   └── page.tsx      → /manager/dashboard (pipeline cards)
+│   │   │   └── section/[section]/
+│   │   │       └── page.tsx      → /manager/section/* (filtered lists)
+│   │   ├── layout.tsx
+│   │   └── globals.css
+│   └── lib/
+│       └── frappe.ts             → API client + auth
+├── public/
+│   ├── mtm-logo.png              → brand logo
+│   └── prep/
+│       └── index.html            → /prep (static marketing page)
+├── package.json
+├── tsconfig.json
+├── tailwind.config.ts
+├── next.config.ts
+└── postcss.config.mjs
+```
 
-## Brand Voice
-The parable of the talents (Matthew 25) is the through-line — the concept is that
-every gift, resource, or opportunity entrusted to you should be multiplied, not buried.
-The tagline "Multiply every talent entrusted to you" anchors this.
+## Brand
+
+- **Colors:** Dark navy `#080c18` + warm gold `#c9a84c → #e2c873`
+- **Fonts:** Playfair Display (headings) + Inter (body)
+- **Logo:** `/mtm-logo.png` — circle crop with gold glow
+- **Tagline:** "Multiply what's been entrusted to you" (Matthew 25)
+
+## Coming Next
+
+- Job detail page `/manager/jobs/[name]` with workflow action buttons
+- Schedule / calendar view
+- Customer pages
+- Inventory views (warehouses, stock, limbo)
+- Reports
+- Bulk operations
+- ManyTalents Money landing + app

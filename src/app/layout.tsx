@@ -1,0 +1,27 @@
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "ManyTalents Manager",
+  description: "Office dashboard for field service businesses — jobs, inventory, invoicing.",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="bg-navy text-cream min-h-screen font-sans antialiased">
+        {children}
+      </body>
+    </html>
+  );
+}
