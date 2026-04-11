@@ -132,3 +132,146 @@ export async function markInvoiced(jobName: string) {
 export async function markPaid(jobName: string) {
   return await callMethod(`${API}.mark_paid`, { job_name: jobName });
 }
+
+// ──────────────────────────────────────────────
+// Magic-link login (auth_utils)
+// ──────────────────────────────────────────────
+
+const AUTH_API = "hcp_replacement.hcp_replacement.api.auth_utils";
+
+/** Extract a human-readable error from a Frappe error response */
+function parseFrappeError(json: any, fallback: string): string {
+  try {
+    if (json?._server_messages) {
+      const msgs = JSON.parse(json._server_messages);
+      if (msgs?.[0]) {
+        const first = typeof msgs[0] === "string" ? JSON.parse(msgs[0]) : msgs[0];
+        if (first?.message) return String(first.message).replace(/<[^>]*>/g, "");
+      }
+    }
+  } catch {}
+  if (json?.exception) return String(json.exception);
+  if (json?.message && typeof json.message === "string") return json.message;
+  return fallback;
+}
+
+/** Call a guest endpoint (no auth required) — used for invite redemption */
+async function callGuestMethod<T = unknown>(
+  method: string,
+  data?: Record<string, unknown>
+): Promise<T> {
+  const res = await fetch(`${SITE.replace(/\/+$/, "")}/api/method/${method}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: data ? JSON.stringify(data) : undefined,
+  });
+  const text = await res.text();
+  let json: any = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error(`API ${method} returned non-JSON (${res.status})`);
+  }
+  if (!res.ok) {
+    throw new Error(parseFrappeError(json, `API ${method} failed (${res.status})`));
+  }
+  return json.message as T;
+}
+
+export interface RedeemInviteResponse {
+  api_key: string;
+  api_secret: string;
+  site_url: string;
+  user_email: string;
+  full_name?: string;
+}
+
+/** Redeem a magic-link token → returns fresh API credentials */
+export async function redeemInvite(token: string): Promise<RedeemInviteResponse> {
+  return await callGuestMethod<RedeemInviteResponse>(`${AUTH_API}.redeem_invite`, { token });
+}
+
+export interface RequestLoginLinkResponse {
+  sent: boolean;
+  message: string;
+  admin_fallback_url?: string;
+}
+
+/** Self-service: request a login link be emailed to an office user */
+export async function requestLoginLink(email: string): Promise<RequestLoginLinkResponse> {
+  return await callGuestMethod<RequestLoginLinkResponse>(`${AUTH_API}.request_login_link`, {
+    email,
+  });
+}
+
+export interface CreateInviteResponse {
+  invite_url: string;
+  expires_at: string;
+  email_sent: boolean;
+}
+
+/** Admin-only: generate a magic-link URL for a user */
+export async function createInvite(
+  userEmail: string,
+  sendEmail: boolean = false
+): Promise<CreateInviteResponse> {
+  return await callMethod<CreateInviteResponse>(`${AUTH_API}.create_invite`, {
+    user_email: userEmail,
+    send_email: sendEmail ? 1 : 0,
+  });
+}
+
+export interface OnboardNewUserResponse extends CreateInviteResponse {
+  user_created: boolean;
+  user_email: string;
+  role_assigned: string;
+}
+
+/** Admin-only: create a new Frappe User + generate magic-link invite in one call */
+export async function onboardNewUser(params: {
+  email: string;
+  fullName: string;
+  role: "MTM Office" | "Accounts Manager" | "System Manager";
+  sendEmail?: boolean;
+}): Promise<OnboardNewUserResponse> {
+  return await callMethod<OnboardNewUserResponse>(`${AUTH_API}.onboard_new_user`, {
+    email: params.email,
+    full_name: params.fullName,
+    role: params.role,
+    send_email: params.sendEmail ? 1 : 0,
+  });
+}
+
+/** Check if current logged-in user has an office role (for admin page access) */
+export async function checkOfficeAccess(): Promise<{ is_office: boolean; is_admin: boolean; user: string }> {
+  return await callMethod(`${AUTH_API}.check_office_access`);
+}
+
+// ──────────────────────────────────────────────
+// Access Approvers management
+// ──────────────────────────────────────────────
+
+export interface Approver {
+  user_email: string;
+  display_name: string;
+  added_on: string;
+  added_by: string;
+}
+
+/** List current access-request approvers (office role required) */
+export async function listApprovers(): Promise<Approver[]> {
+  return await callMethod<Approver[]>(`${AUTH_API}.list_approvers`);
+}
+
+/** Add a user to the approvers list (System Manager only) */
+export async function addApprover(userEmail: string): Promise<{ added: boolean; user_email: string }> {
+  return await callMethod(`${AUTH_API}.add_approver`, { user_email: userEmail });
+}
+
+/** Remove a user from the approvers list (System Manager only) */
+export async function removeApprover(userEmail: string): Promise<{ removed: boolean; user_email: string }> {
+  return await callMethod(`${AUTH_API}.remove_approver`, { user_email: userEmail });
+}

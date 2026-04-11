@@ -98,6 +98,20 @@ export default function DashboardPage() {
             >
               All Jobs
             </Link>
+            <Link
+              href="/manager/admin/invite"
+              className="text-sm text-neutral-300 hover:text-gold-light transition"
+              title="Generate magic-link login for office staff"
+            >
+              Invite
+            </Link>
+            <Link
+              href="/manager/admin/approvers"
+              className="text-sm text-neutral-300 hover:text-gold-light transition"
+              title="Manage who can approve access requests"
+            >
+              Approvers
+            </Link>
             <button
               onClick={handleLogout}
               className="text-sm text-neutral-400 hover:text-red-400 transition"
