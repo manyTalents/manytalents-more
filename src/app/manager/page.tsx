@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   getAuth,
   setAuth,
@@ -277,7 +278,13 @@ function LoginPageInner() {
           </div>
         </div>
 
-        <p className="text-center text-neutral-500 text-xs mt-6">
+        <p className="text-center text-xs mt-6">
+          <Link href="/manager/request-access" className="text-neutral-400 hover:text-gold-light transition">
+            Don&rsquo;t have an account? Request Access
+          </Link>
+        </p>
+
+        <p className="text-center text-neutral-500 text-xs mt-4">
           &copy; 2026 ManyTalents More, LLC
         </p>
       </div>

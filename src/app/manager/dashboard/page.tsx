@@ -106,6 +106,13 @@ export default function DashboardPage() {
               Invite
             </Link>
             <Link
+              href="/manager/admin/requests"
+              className="text-sm text-neutral-300 hover:text-gold-light transition"
+              title="Review access requests"
+            >
+              Requests
+            </Link>
+            <Link
               href="/manager/admin/approvers"
               className="text-sm text-neutral-300 hover:text-gold-light transition"
               title="Manage who can approve access requests"

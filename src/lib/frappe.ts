@@ -275,3 +275,92 @@ export async function addApprover(userEmail: string): Promise<{ added: boolean; 
 export async function removeApprover(userEmail: string): Promise<{ removed: boolean; user_email: string }> {
   return await callMethod(`${AUTH_API}.remove_approver`, { user_email: userEmail });
 }
+
+// ──────────────────────────────────────────────
+// Access Requests
+// ──────────────────────────────────────────────
+
+export interface SubmitAccessRequestResponse {
+  submitted: boolean;
+  message: string;
+}
+
+/** Public: submit an access request (guest, no auth) */
+export async function submitAccessRequest(params: {
+  name: string;
+  email: string;
+  role?: string;
+  note?: string;
+}): Promise<SubmitAccessRequestResponse> {
+  return await callGuestMethod<SubmitAccessRequestResponse>(
+    `${AUTH_API}.submit_access_request`,
+    { name: params.name, email: params.email, role: params.role || "MTM Office", note: params.note || "" }
+  );
+}
+
+export interface AccessRequestInfo {
+  name: string;
+  requester_name: string;
+  requester_email: string;
+  requested_role: string;
+  note: string;
+  status: string;
+  requested_at: string;
+}
+
+/** Public: load an access request by approver token (for the approve page) */
+export async function getAccessRequestByToken(token: string): Promise<AccessRequestInfo> {
+  return await callGuestMethod<AccessRequestInfo>(`${AUTH_API}.get_access_request_by_token`, { token });
+}
+
+export interface ApproveRequestResponse {
+  approved: boolean;
+  user_email: string;
+  role_assigned: string;
+  invite_url: string;
+  email_sent: boolean;
+}
+
+/** Approve an access request (guest via token, or session via request_id) */
+export async function approveAccessRequest(params: {
+  token?: string;
+  requestId?: string;
+  role?: string;
+}): Promise<ApproveRequestResponse> {
+  return await callGuestMethod<ApproveRequestResponse>(`${AUTH_API}.approve_access_request`, {
+    token: params.token || "",
+    request_id: params.requestId || "",
+    role: params.role || "",
+  });
+}
+
+export interface DenyRequestResponse {
+  denied: boolean;
+  requester_email: string;
+}
+
+/** Deny an access request (guest via token, or session via request_id) */
+export async function denyAccessRequest(params: {
+  token?: string;
+  requestId?: string;
+  reason?: string;
+}): Promise<DenyRequestResponse> {
+  return await callGuestMethod<DenyRequestResponse>(`${AUTH_API}.deny_access_request`, {
+    token: params.token || "",
+    request_id: params.requestId || "",
+    reason: params.reason || "",
+  });
+}
+
+export interface AccessRequestListItem extends AccessRequestInfo {
+  approved_by?: string;
+  approved_at?: string;
+  denied_by?: string;
+  denied_at?: string;
+  denial_reason?: string;
+}
+
+/** List access requests by status (office role required) */
+export async function listAccessRequests(status: string = "Pending"): Promise<AccessRequestListItem[]> {
+  return await callMethod<AccessRequestListItem[]>(`${AUTH_API}.list_access_requests`, { status });
+}
