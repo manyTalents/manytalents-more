@@ -23,9 +23,7 @@ export default function LandingPage() {
             <span className="tm">&trade;</span>
           </h1>
           <p className="tagline">
-            Professional tools for the trades that matter.
-            <br />
-            Three tools. One mission.
+            Three tools to many talents. One mission.
           </p>
           <a href="#products" className="scroll-indicator">
             scroll down ↓
