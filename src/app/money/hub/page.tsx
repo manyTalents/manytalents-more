@@ -95,7 +95,7 @@ export default function HubPage() {
   // Format equity data for charts
   const veoeChartData = veoeEquity.map((p) => ({
     time: p.date,
-    value: p.equity,
+    value: p.value,
   }));
 
   const cryptoChartData = cryptoEquity.map((p) => ({

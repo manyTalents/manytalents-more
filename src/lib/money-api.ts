@@ -53,9 +53,18 @@ async function fetchJSON<T>(url: string): Promise<T> {
 
 export const veoe = {
   summary: () => fetchJSON<VEOESummary>(`${BASE}/veoe/api/summary`),
-  equity: () => fetchJSON<VEOEEquityPoint[]>(`${BASE}/veoe/api/equity`),
-  trades: () => fetchJSON<VEOETrade[]>(`${BASE}/veoe/api/trades`),
-  signals: () => fetchJSON<VEOESignal[]>(`${BASE}/veoe/api/signals`),
+  equity: async () => {
+    const res = await fetchJSON<{ points: VEOEEquityPoint[] }>(`${BASE}/veoe/api/equity`);
+    return res.points || [];
+  },
+  trades: async () => {
+    const res = await fetchJSON<{ trades: VEOETrade[] }>(`${BASE}/veoe/api/trades`);
+    return res.trades || [];
+  },
+  signals: async () => {
+    const res = await fetchJSON<{ signals: VEOESignal[] }>(`${BASE}/veoe/api/signals`);
+    return res.signals || [];
+  },
   alpha: () => fetchJSON<VEOEAlpha>(`${BASE}/veoe/api/alpha`),
   config: () => fetchJSON<VEOEConfig>(`${BASE}/veoe/api/config`),
   learning: () => fetchJSON<VEOELearning>(`${BASE}/veoe/api/learning`),

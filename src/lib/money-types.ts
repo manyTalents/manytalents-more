@@ -20,8 +20,8 @@ export interface VEOESummary {
 
 export interface VEOEEquityPoint {
   date: string;
-  equity: number;
-  high_water_mark?: number;
+  value: number;
+  hwm?: number;
   drawdown_pct?: number;
 }
 

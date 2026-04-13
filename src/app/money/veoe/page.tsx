@@ -59,7 +59,7 @@ export default function VEOEPage() {
   const fmt = (n: number) =>
     `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const chartData = equity.map((p) => ({ time: p.date, value: p.equity }));
+  const chartData = equity.map((p) => ({ time: p.date, value: p.value }));
 
   const openTrades = trades.filter((t) => t.status === "open");
   const closedTrades = trades.filter((t) => t.status !== "open");
