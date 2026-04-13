@@ -62,7 +62,7 @@ export default function HubPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const totalValue = (veoeData?.account_value || 0) + (cryptoBalance?.total_equity || 0);
+  const totalValue = (veoeData?.account_value || 0) + (cryptoBalance?.total_usd || 0);
   const totalPnl = (veoeData?.total_pnl || 0) + (cryptoStats?.total_pnl || 0);
 
   const bots: BotStatus[] = [
@@ -83,7 +83,7 @@ export default function HubPage() {
       href: "/money/crypto",
       label: "Crypto Trading",
       mode: "live",
-      value: cryptoBalance?.total_equity || 0,
+      value: cryptoBalance?.total_usd || 0,
       pnl: cryptoStats?.total_pnl || 0,
       pnlPct: cryptoStats?.total_return_pct || 0,
       positions: 0,

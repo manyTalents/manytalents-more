@@ -82,9 +82,9 @@ export default function CryptoPage() {
             prev
               ? {
                   ...prev,
-                  total_equity: data.balance.total_equity,
+                  total_usd: data.balance.total_equity,
                   cash_usd: data.balance.cash,
-                  source: "live",
+                  source: "live" as string,
                   timestamp: data.timestamp,
                 }
               : prev
@@ -169,7 +169,7 @@ export default function CryptoPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
         <MetricCard
           label="Total Equity"
-          value={balance ? fmt(balance.total_equity) : "..."}
+          value={balance ? fmt(balance.total_usd) : "..."}
           subValue={balance?.source === "live" ? "Live from Kraken" : "Cached"}
           loading={loading}
         />
@@ -223,7 +223,7 @@ export default function CryptoPage() {
                   <div className="bg-navy-surface border border-navy-border rounded-xl p-4">
                     <p className="text-xs text-neutral-500 mb-1">Positions</p>
                     <p className="font-mono text-lg">
-                      {risk.open_positions} / {risk.max_positions}
+                      {risk.positions_open} / {risk.positions_max}
                     </p>
                   </div>
                   <div className="bg-navy-surface border border-navy-border rounded-xl p-4">
@@ -245,26 +245,19 @@ export default function CryptoPage() {
                 <p className="text-neutral-500 text-sm">No open positions.</p>
               ) : (
                 <div className="space-y-3">
-                  {positions.map((p, i) => (
+                  {positions.map((p) => (
                     <div
-                      key={i}
+                      key={p.id}
                       className="flex items-center justify-between py-2 border-b border-navy-border/50 last:border-0"
                     >
                       <div>
                         <p className="font-medium text-sm">{p.pair}</p>
                         <p className="text-xs text-neutral-500">
-                          {p.strategy} &middot; {p.side.toUpperCase()}
+                          {p.strategy_name} &middot; {p.side}
                         </p>
                       </div>
-                      <p
-                        className={`font-mono text-sm ${
-                          p.unrealized_pnl >= 0
-                            ? "text-emerald-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {p.unrealized_pnl >= 0 ? "+" : ""}
-                        {fmt(p.unrealized_pnl)}
+                      <p className="font-mono text-sm text-neutral-300">
+                        {fmt(p.quote_size)}
                       </p>
                     </div>
                   ))}
@@ -355,7 +348,7 @@ export default function CryptoPage() {
           )}
 
           {/* Pair Learner */}
-          {learning && learning.activated && (
+          {learning && learning.learner_active && (
             <div className="bg-navy-surface border border-navy-border rounded-2xl p-6 mb-8">
               <h3 className="text-lg font-serif font-bold mb-4">
                 Pair Learner
@@ -363,19 +356,19 @@ export default function CryptoPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                 <div>
                   <p className="text-xs text-neutral-500">Lessons</p>
-                  <p className="font-mono">{learning.total_lessons} ({learning.live_lessons} live)</p>
+                  <p className="font-mono">{learning.lesson_count} ({learning.live_count} live)</p>
                 </div>
                 <div>
                   <p className="text-xs text-neutral-500">Win Rate</p>
-                  <p className="font-mono">{learning.overall_win_rate.toFixed(1)}%</p>
+                  <p className="font-mono">{learning.overall_wr.toFixed(1)}%</p>
                 </div>
                 <div>
                   <p className="text-xs text-neutral-500">Maker WR</p>
-                  <p className="font-mono">{learning.maker_win_rate.toFixed(1)}%</p>
+                  <p className="font-mono">{learning.maker_wr.toFixed(1)}%</p>
                 </div>
                 <div>
                   <p className="text-xs text-neutral-500">Confidence</p>
-                  <p className="font-mono">{(learning.confidence * 100).toFixed(0)}%</p>
+                  <p className="font-mono capitalize">{learning.confidence}</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -407,7 +400,7 @@ export default function CryptoPage() {
                       >
                         <span className="font-mono">{p.pair}</span>
                         <span className="text-red-400 font-mono">
-                          {p.win_rate.toFixed(1)}%
+                          {p.wr.toFixed(1)}%
                         </span>
                       </div>
                     ))}
@@ -455,7 +448,7 @@ export default function CryptoPage() {
                 </tr>
               </thead>
               <tbody>
-                {stats.monthly_performance.map((m) => (
+                {stats.monthly_returns.map((m) => (
                   <tr
                     key={m.month}
                     className="border-b border-navy-border/50 hover:bg-navy-card/50 transition"

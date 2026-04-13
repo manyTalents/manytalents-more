@@ -74,11 +74,13 @@ export interface VEOELearning {
 // ── Crypto Types ────────────────────────────────
 
 export interface CryptoBalance {
-  total_equity: number;
+  total_usd: number;
   cash_usd: number;
   cash_usdc: number;
+  inventory_usd: number;
   timestamp: string;
-  source: "live" | "cached";
+  source: string;
+  cached: boolean;
 }
 
 export interface CryptoEquityPoint {
@@ -89,13 +91,16 @@ export interface CryptoEquityPoint {
 }
 
 export interface CryptoPosition {
+  id: number;
   pair: string;
-  side: "buy" | "sell";
+  side: "BUY" | "SELL" | string;
   entry_price: number;
-  current_price: number;
-  size: number;
-  unrealized_pnl: number;
+  quote_size: number;
+  base_size: number;
+  entry_time: string;
   strategy: string;
+  entry_fee: number;
+  strategy_name: string;
 }
 
 export interface CryptoTrade {
@@ -154,15 +159,20 @@ export interface CryptoSignals {
 }
 
 export interface CryptoRisk {
+  current_equity: number;
+  peak_equity: number;
   drawdown_pct: number;
-  drawdown_tier: "safe" | "caution" | "warning" | "critical";
-  open_positions: number;
-  max_positions: number;
+  drawdown_tier: string;
+  positions_open: number;
+  positions_max: number;
   cash_reserve_pct: number;
+  cash_reserve_ok: boolean;
+  today_pnl: number;
+  today_pnl_pct: number;
   circuit_breakers: {
-    daily_loss: { triggered: boolean; limit: number };
-    weekly_loss: { triggered: boolean; limit: number };
-    monthly_loss: { triggered: boolean; limit: number };
+    daily_limit: { threshold: number; current: number; tripped: boolean };
+    weekly_limit: { threshold: number; current: number; tripped: boolean };
+    monthly_limit: { threshold: number; current: number; tripped: boolean };
   };
 }
 
@@ -172,7 +182,11 @@ export interface CryptoStats {
   total_pnl: number;
   total_fees: number;
   total_trades: number;
-  monthly_performance: Array<{
+  avg_win: number;
+  avg_loss: number;
+  starting_equity: number;
+  current_equity: number;
+  monthly_returns: Array<{
     month: string;
     pnl: number;
     return_pct: number;
@@ -180,22 +194,24 @@ export interface CryptoStats {
 }
 
 export interface CryptoLearning {
-  activated: boolean;
-  confidence: number;
-  total_lessons: number;
-  live_lessons: number;
-  overall_win_rate: number;
-  maker_win_rate: number;
-  taker_win_rate: number;
+  learner_active: boolean;
+  confidence: string;
+  lesson_count: number;
+  bootstrap_count: number;
+  live_count: number;
+  overall_wr: number;
+  maker_wr: number;
+  taker_wr: number;
   top_pairs: Array<{ pair: string; score: number }>;
-  blocked_pairs: Array<{ pair: string; win_rate: number }>;
+  bottom_pairs: Array<{ pair: string; score: number }>;
+  blocked_pairs: Array<{ pair: string; trades: number; wins: number; wr: number }>;
 }
 
 // ── WebSocket Types ─────────────────────────────
 
 export interface CryptoWSUpdate {
   balance: {
-    total_equity: number;
+    total_equity: number;  // WS uses total_equity, REST uses total_usd
     cash: number;
   };
   signals_summary: {
