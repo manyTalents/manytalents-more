@@ -177,6 +177,14 @@ export async function searchCustomers(query: string): Promise<any[]> {
   return await callMethod(`${API}.search_customers`, { query });
 }
 
+export async function getCustomerHistory(customerName: string): Promise<any> {
+  return await callMethod(`${API}.get_customer_history`, { customer_name: customerName });
+}
+
+export async function searchAddresses(query: string): Promise<any[]> {
+  return await callMethod(`${API}.search_addresses`, { query });
+}
+
 // ──────────────────────────────────────────────
 // Magic-link login (auth_utils)
 // ──────────────────────────────────────────────
