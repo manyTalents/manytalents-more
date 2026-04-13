@@ -134,6 +134,50 @@ export async function markPaid(jobName: string) {
 }
 
 // ──────────────────────────────────────────────
+// Job Intake & Labor/Service Management
+// ──────────────────────────────────────────────
+
+export async function getDefaultLaborRate(): Promise<{ rate: number; labor_item: string }> {
+  return await callMethod(`${API}.get_default_labor_rate`);
+}
+
+export async function createJob(params: {
+  customer_name: string;
+  address?: string;
+  town?: string;
+  customer_phone?: string;
+  description?: string;
+  scheduled_date?: string;
+  job_type?: string;
+  priority?: string;
+  is_estimate?: boolean;
+  occupant_name?: string;
+  occupant_phone?: string;
+  labor_hours?: number;
+  labor_rate?: number;
+  labor_description?: string;
+}): Promise<any> {
+  return await callMethod(`${API}.create_job`, {
+    ...params,
+    is_estimate: params.is_estimate ? 1 : 0,
+  } as any);
+}
+
+export async function updateJobServices(
+  jobName: string,
+  services: Array<{ description: string; qty: number; rate: number }>
+): Promise<any> {
+  return await callMethod(`${API}.update_job_services`, {
+    job_name: jobName,
+    services: JSON.stringify(services),
+  });
+}
+
+export async function searchCustomers(query: string): Promise<any[]> {
+  return await callMethod(`${API}.search_customers`, { query });
+}
+
+// ──────────────────────────────────────────────
 // Magic-link login (auth_utils)
 // ──────────────────────────────────────────────
 

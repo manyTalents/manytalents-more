@@ -78,10 +78,16 @@ export default function AllJobsPage() {
             ← Dashboard
           </Link>
           <div className="h-5 w-px bg-navy-border" />
-          <div>
+          <div className="flex-1">
             <h1 className="font-serif text-lg font-bold">All Jobs</h1>
             <p className="text-xs text-neutral-500">Every job in the system</p>
           </div>
+          <Link
+            href="/manager/jobs/new"
+            className="bg-gradient-to-br from-gold to-gold-dark text-navy font-bold px-5 py-2.5 rounded-lg text-sm hover:from-gold-light hover:to-gold transition"
+          >
+            + New Job
+          </Link>
         </div>
       </nav>
 

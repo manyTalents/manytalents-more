@@ -11,6 +11,8 @@ import {
   createInvoiceForJob,
   markInvoiced,
   markPaid,
+  updateJobServices,
+  getDefaultLaborRate,
 } from "@/lib/frappe";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -86,6 +88,14 @@ export default function JobDetailPage() {
   const [actionResult, setActionResult] = useState("");
   const [error, setError] = useState("");
 
+  // Editable services state
+  const [editingServices, setEditingServices] = useState(false);
+  const [serviceRows, setServiceRows] = useState<
+    Array<{ description: string; qty: string; rate: string }>
+  >([]);
+  const [savingServices, setSavingServices] = useState(false);
+  const [defaultRate, setDefaultRate] = useState(150);
+
   const loadJob = () => {
     setLoading(true);
     getJobDetail(jobName)
@@ -100,7 +110,66 @@ export default function JobDetailPage() {
       return;
     }
     loadJob();
+    getDefaultLaborRate()
+      .then((res) => setDefaultRate(res.rate))
+      .catch(() => {});
   }, [jobName, router]);
+
+  const startEditingServices = () => {
+    const rows =
+      job.services && job.services.length > 0
+        ? job.services.map((s: any) => ({
+            description: s.description || "",
+            qty: String(s.qty || ""),
+            rate: String(s.rate || ""),
+          }))
+        : [{ description: "Labor", qty: "", rate: String(defaultRate) }];
+    setServiceRows(rows);
+    setEditingServices(true);
+  };
+
+  const addServiceRow = () => {
+    setServiceRows([
+      ...serviceRows,
+      { description: "Labor", qty: "", rate: String(defaultRate) },
+    ]);
+  };
+
+  const removeServiceRow = (idx: number) => {
+    setServiceRows(serviceRows.filter((_, i) => i !== idx));
+  };
+
+  const updateServiceRow = (
+    idx: number,
+    field: "description" | "qty" | "rate",
+    value: string
+  ) => {
+    const updated = [...serviceRows];
+    updated[idx] = { ...updated[idx], [field]: value };
+    setServiceRows(updated);
+  };
+
+  const saveServices = async () => {
+    setSavingServices(true);
+    setError("");
+    try {
+      const cleaned = serviceRows
+        .filter((r) => parseFloat(r.qty) > 0 || parseFloat(r.rate) > 0)
+        .map((r) => ({
+          description: r.description || "Labor",
+          qty: parseFloat(r.qty) || 0,
+          rate: parseFloat(r.rate) || 0,
+        }));
+      await updateJobServices(jobName, cleaned);
+      setEditingServices(false);
+      setActionResult("Services updated");
+      loadJob();
+    } catch (err: any) {
+      setError(err.message || "Could not save services");
+    } finally {
+      setSavingServices(false);
+    }
+  };
 
   const handleAction = async (
     action: (name: string) => Promise<any>,
@@ -322,6 +391,163 @@ export default function JobDetailPage() {
             )}
           </div>
         )}
+
+        {/* Services (editable) */}
+        <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs uppercase tracking-wider text-neutral-400">
+              Services / Labor
+            </p>
+            {!editingServices ? (
+              <button
+                onClick={startEditingServices}
+                className="text-xs text-gold hover:text-gold-light transition"
+              >
+                Edit
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEditingServices(false)}
+                  className="text-xs text-neutral-500 hover:text-cream transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveServices}
+                  disabled={savingServices}
+                  className="text-xs bg-gold-dark text-navy font-bold px-3 py-1 rounded transition disabled:opacity-60"
+                >
+                  {savingServices ? "Saving..." : "Save"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {editingServices ? (
+            <div className="space-y-3">
+              {serviceRows.map((row, idx) => (
+                <div key={idx} className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    {idx === 0 && (
+                      <label className="block text-xs text-neutral-500 mb-1">
+                        Description
+                      </label>
+                    )}
+                    <input
+                      type="text"
+                      value={row.description}
+                      onChange={(e) =>
+                        updateServiceRow(idx, "description", e.target.value)
+                      }
+                      className="w-full bg-navy border border-navy-border rounded px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark"
+                    />
+                  </div>
+                  <div className="w-20">
+                    {idx === 0 && (
+                      <label className="block text-xs text-neutral-500 mb-1">
+                        Hours
+                      </label>
+                    )}
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={row.qty}
+                      onChange={(e) =>
+                        updateServiceRow(idx, "qty", e.target.value)
+                      }
+                      className="w-full bg-navy border border-navy-border rounded px-3 py-2 text-sm text-cream text-right focus:outline-none focus:border-gold-dark"
+                    />
+                  </div>
+                  <div className="w-24">
+                    {idx === 0 && (
+                      <label className="block text-xs text-neutral-500 mb-1">
+                        Rate
+                      </label>
+                    )}
+                    <input
+                      type="number"
+                      step="1"
+                      value={row.rate}
+                      onChange={(e) =>
+                        updateServiceRow(idx, "rate", e.target.value)
+                      }
+                      className="w-full bg-navy border border-navy-border rounded px-3 py-2 text-sm text-cream text-right focus:outline-none focus:border-gold-dark"
+                    />
+                  </div>
+                  <div className="w-24 text-right">
+                    {idx === 0 && (
+                      <label className="block text-xs text-neutral-500 mb-1">
+                        Total
+                      </label>
+                    )}
+                    <p className="py-2 text-sm text-gold font-medium">
+                      $
+                      {(
+                        (parseFloat(row.qty) || 0) *
+                        (parseFloat(row.rate) || 0)
+                      ).toFixed(2)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => removeServiceRow(idx)}
+                    className="text-neutral-600 hover:text-red-400 text-lg pb-1"
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={addServiceRow}
+                className="text-xs text-gold hover:text-gold-light transition"
+              >
+                + Add service line
+              </button>
+            </div>
+          ) : job.services && job.services.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-neutral-500 uppercase border-b border-navy-border">
+                    <th className="text-left py-2 pr-4">Description</th>
+                    <th className="text-right py-2 px-4">Hrs</th>
+                    <th className="text-right py-2 px-4">Rate</th>
+                    <th className="text-right py-2 pl-4">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {job.services.map((s: any, i: number) => (
+                    <tr key={i} className="border-b border-navy-border/50">
+                      <td className="py-2 pr-4 text-neutral-300">
+                        {s.description || s.item_name || "Labor"}
+                      </td>
+                      <td className="py-2 px-4 text-right text-neutral-400">
+                        {s.qty}
+                      </td>
+                      <td className="py-2 px-4 text-right text-neutral-400">
+                        ${fmtCurrency(s.rate).replace("$", "")}
+                      </td>
+                      <td className="py-2 pl-4 text-right text-gold font-medium">
+                        {fmtCurrency(s.amount || s.qty * s.rate)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-neutral-500 text-sm">
+              No services added yet.{" "}
+              <button
+                onClick={startEditingServices}
+                className="text-gold hover:text-gold-light"
+              >
+                Add labor
+              </button>
+            </p>
+          )}
+        </div>
 
         {/* Assigned techs */}
         {job.assigned_techs && job.assigned_techs.length > 0 && (
