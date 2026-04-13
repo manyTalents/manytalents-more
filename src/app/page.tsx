@@ -101,7 +101,7 @@ export default function LandingPage() {
             </span>
           </Link>
 
-          <a href="#" className="product-card">
+          <Link href="/money" className="product-card">
             <div className="card-number">03</div>
             <h3 className="card-title">
               Many<span className="gold">Talents</span> Money
@@ -112,8 +112,21 @@ export default function LandingPage() {
               position sizing, risk management, and portfolio tracking. Treat
               every dollar like it was given to you to multiply.
             </p>
-            <span className="card-link disabled">Coming Soon</span>
-          </a>
+            <span className="card-link">
+              Open Money
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </span>
+          </Link>
         </div>
       </section>
 
