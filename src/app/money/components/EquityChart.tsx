@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createChart, type IChartApi, ColorType, AreaSeries } from "lightweight-charts";
 
 interface DataPoint {
   time: string;
@@ -22,60 +21,76 @@ export default function EquityChart({
   loading,
 }: EquityChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
+  const chartRef = useRef<ReturnType<typeof import("lightweight-charts").createChart> | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || loading) return;
 
-    const chart = createChart(containerRef.current, {
-      height,
-      layout: {
-        background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#6b7280",
-        fontFamily: "Inter, sans-serif",
-      },
-      grid: {
-        vertLines: { color: "#1a1f32" },
-        horzLines: { color: "#1a1f32" },
-      },
-      rightPriceScale: {
-        borderColor: "#1a1f32",
-      },
-      timeScale: {
-        borderColor: "#1a1f32",
-        timeVisible: false,
-      },
-      crosshair: {
-        horzLine: { color: "#c9a84c40" },
-        vertLine: { color: "#c9a84c40" },
-      },
-    });
+    let cancelled = false;
 
-    const series = chart.addSeries(AreaSeries, {
-      lineColor: color,
-      topColor: `${color}30`,
-      bottomColor: `${color}05`,
-      lineWidth: 2,
-    });
+    import("lightweight-charts").then((lc) => {
+      if (cancelled || !containerRef.current) return;
 
-    if (data.length > 0) {
-      series.setData(data);
-      chart.timeScale().fitContent();
-    }
+      const chart = lc.createChart(containerRef.current, {
+        height,
+        layout: {
+          background: { type: lc.ColorType.Solid, color: "transparent" },
+          textColor: "#6b7280",
+          fontFamily: "Inter, sans-serif",
+        },
+        grid: {
+          vertLines: { color: "#1a1f32" },
+          horzLines: { color: "#1a1f32" },
+        },
+        rightPriceScale: {
+          borderColor: "#1a1f32",
+        },
+        timeScale: {
+          borderColor: "#1a1f32",
+          timeVisible: false,
+        },
+        crosshair: {
+          horzLine: { color: "#c9a84c40" },
+          vertLine: { color: "#c9a84c40" },
+        },
+      });
 
-    chartRef.current = chart;
+      const series = chart.addSeries(lc.AreaSeries, {
+        lineColor: color,
+        topColor: `${color}30`,
+        bottomColor: `${color}05`,
+        lineWidth: 2,
+      });
 
-    const handleResize = () => {
-      if (containerRef.current) {
-        chart.applyOptions({ width: containerRef.current.clientWidth });
+      if (data.length > 0) {
+        series.setData(data);
+        chart.timeScale().fitContent();
       }
-    };
-    window.addEventListener("resize", handleResize);
+
+      chartRef.current = chart;
+
+      const handleResize = () => {
+        if (containerRef.current) {
+          chart.applyOptions({ width: containerRef.current.clientWidth });
+        }
+      };
+      window.addEventListener("resize", handleResize);
+
+      // Store cleanup for the outer effect
+      (containerRef.current as any).__cleanup = () => {
+        window.removeEventListener("resize", handleResize);
+        chart.remove();
+        chartRef.current = null;
+      };
+    });
 
     return () => {
-      window.removeEventListener("resize", handleResize);
-      chart.remove();
-      chartRef.current = null;
+      cancelled = true;
+      const el = containerRef.current as any;
+      if (el?.__cleanup) {
+        el.__cleanup();
+        delete el.__cleanup;
+      }
     };
   }, [data, height, color, loading]);
 
