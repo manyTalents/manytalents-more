@@ -18,7 +18,7 @@ export default function NewJobPage() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Location
   const [address, setAddress] = useState("");
