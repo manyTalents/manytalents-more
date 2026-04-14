@@ -70,7 +70,7 @@ export default function HubPage() {
       name: "VEOE",
       href: "/money/veoe",
       label: "Options Trading",
-      mode: veoeData?.mode || "paper",
+      mode: "paper",
       value: veoeData?.account_value || 0,
       pnl: veoeData?.total_pnl || 0,
       pnlPct: veoeData?.total_pnl_pct || 0,

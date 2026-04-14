@@ -68,7 +68,7 @@ export default function VEOEPage() {
     id: t.id,
     ticker: t.ticker,
     strategy: t.strategy,
-    pnl: t.pnl,
+    pnl: t.pnl || 0,
     date: t.exit_date || t.entry_date,
   }));
 
@@ -82,7 +82,7 @@ export default function VEOEPage() {
           </p>
           <h2 className="text-3xl font-serif font-extrabold">VEOE</h2>
         </div>
-        {summary && <StatusBadge mode={summary.mode} />}
+        {config && <StatusBadge mode={config.execution_mode} />}
       </div>
 
       {/* Error */}
@@ -108,18 +108,18 @@ export default function VEOEPage() {
         />
         <MetricCard
           label="MTD P&L"
-          value={summary ? fmt(summary.mtd_pnl) : "..."}
-          trend={summary ? (summary.mtd_pnl >= 0 ? "up" : "down") : undefined}
+          value={summary ? fmt(summary.mtd.net_profit) : "..."}
+          trend={summary ? (summary.mtd.net_profit >= 0 ? "up" : "down") : undefined}
           loading={loading}
         />
         <MetricCard
           label="Win Rate"
-          value={summary ? `${summary.win_rate.toFixed(1)}%` : "..."}
+          value={summary ? `${summary.mtd.win_rate.toFixed(1)}%` : "..."}
           loading={loading}
         />
         <MetricCard
-          label="Max Drawdown"
-          value={summary ? `${summary.max_drawdown.toFixed(1)}%` : "..."}
+          label="Drawdown"
+          value={summary ? `${summary.drawdown_pct.toFixed(1)}%` : "..."}
           trend="down"
           loading={loading}
         />
@@ -157,12 +157,12 @@ export default function VEOEPage() {
                 />
                 <SignalCard
                   label="Alpha"
-                  value={`${alpha.alpha >= 0 ? "+" : ""}${alpha.alpha.toFixed(2)}%`}
-                  color={alpha.alpha >= 0 ? "gold" : "red"}
+                  value={`${alpha.alpha_pct >= 0 ? "+" : ""}${alpha.alpha_pct.toFixed(2)}%`}
+                  color={alpha.alpha_pct >= 0 ? "gold" : "red"}
                 />
                 <SignalCard
                   label="Sharpe Ratio"
-                  value={alpha.sharpe_ratio.toFixed(2)}
+                  value={alpha.sharpe.toFixed(2)}
                   color="gold"
                 />
               </div>
@@ -180,14 +180,12 @@ export default function VEOEPage() {
                   <StatusBadge mode={config.execution_mode} />
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">Max Positions</span>
-                  <span className="font-mono">{config.max_positions}</span>
+                  <span className="text-neutral-500">Strategy</span>
+                  <span className="font-mono">{config.strategy}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">Target Risk</span>
-                  <span className="font-mono">
-                    {config.target_risk_pct}%
-                  </span>
+                  <span className="text-neutral-500">Max Positions</span>
+                  <span className="font-mono">{config.max_positions}</span>
                 </div>
               </div>
             </div>
@@ -206,11 +204,11 @@ export default function VEOEPage() {
               <thead>
                 <tr className="border-b border-navy-border text-neutral-500 text-xs uppercase tracking-wider">
                   <th className="text-left py-3 px-2">Ticker</th>
-                  <th className="text-left py-3 px-2">Type</th>
+                  <th className="text-left py-3 px-2">Strategy</th>
                   <th className="text-right py-3 px-2">Entry</th>
                   <th className="text-right py-3 px-2">DTE</th>
                   <th className="text-right py-3 px-2">Cost</th>
-                  <th className="text-right py-3 px-2">P&L</th>
+                  <th className="text-right py-3 px-2">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -220,8 +218,8 @@ export default function VEOEPage() {
                     className="border-b border-navy-border/50 hover:bg-navy-card/50 transition"
                   >
                     <td className="py-3 px-2 font-medium">{t.ticker}</td>
-                    <td className="py-3 px-2 text-neutral-400 uppercase text-xs">
-                      {t.direction}
+                    <td className="py-3 px-2 text-neutral-400 text-xs">
+                      {t.strategy}
                     </td>
                     <td className="py-3 px-2 text-right font-mono">
                       ${t.entry_price.toFixed(2)}
@@ -232,12 +230,10 @@ export default function VEOEPage() {
                     <td className="py-3 px-2 text-right font-mono">
                       ${t.cost.toFixed(2)}
                     </td>
-                    <td
-                      className={`py-3 px-2 text-right font-mono ${
-                        t.pnl >= 0 ? "text-emerald-400" : "text-red-400"
-                      }`}
-                    >
-                      {t.pnl >= 0 ? "+" : ""}${t.pnl.toFixed(2)}
+                    <td className="py-3 px-2 text-right">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">
+                        {t.mode}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -258,10 +254,9 @@ export default function VEOEPage() {
               <thead>
                 <tr className="border-b border-navy-border text-neutral-500 text-xs uppercase tracking-wider">
                   <th className="text-left py-3 px-2">Ticker</th>
-                  <th className="text-left py-3 px-2">Strategy</th>
                   <th className="text-right py-3 px-2">Score</th>
+                  <th className="text-left py-3 px-2">Breakout</th>
                   <th className="text-right py-3 px-2">Date</th>
-                  <th className="text-right py-3 px-2">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -271,23 +266,14 @@ export default function VEOEPage() {
                     className="border-b border-navy-border/50 hover:bg-navy-card/50 transition"
                   >
                     <td className="py-3 px-2 font-medium">{s.ticker}</td>
-                    <td className="py-3 px-2 text-neutral-400">{s.strategy}</td>
                     <td className="py-3 px-2 text-right font-mono">
                       {s.score.toFixed(1)}
                     </td>
+                    <td className="py-3 px-2 text-xs text-neutral-400">
+                      {s.breakout_status}
+                    </td>
                     <td className="py-3 px-2 text-right text-neutral-500">
                       {s.date}
-                    </td>
-                    <td className="py-3 px-2 text-right">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          s.passed
-                            ? "bg-emerald-500/10 text-emerald-400"
-                            : "bg-neutral-500/10 text-neutral-400"
-                        }`}
-                      >
-                        {s.passed ? "Passed" : "Filtered"}
-                      </span>
                     </td>
                   </tr>
                 ))}

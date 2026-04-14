@@ -277,7 +277,7 @@ export default function CryptoPage() {
                     name={s.display_name}
                     status={s.status}
                     allocation={s.capital_allocation_pct}
-                    trades={s.trade_count}
+                    trades={s.total_trades}
                     winRate={s.win_rate}
                     pnl={s.total_pnl}
                   />
@@ -311,14 +311,14 @@ export default function CryptoPage() {
                   label="VIX"
                   value={signals.vix.value.toFixed(1)}
                   status={signals.vix.status}
-                  detail={`20D: ${signals.vix.change_20d >= 0 ? "+" : ""}${signals.vix.change_20d.toFixed(1)}%`}
+                  detail={signals.vix.action}
                   color={signals.vix.value > 25 ? "red" : signals.vix.value > 20 ? "amber" : "emerald"}
                 />
                 <SignalCard
                   label="DXY"
                   value={signals.dxy.value.toFixed(2)}
-                  status={signals.dxy.trend}
-                  detail={`20D: ${signals.dxy.change_20d >= 0 ? "+" : ""}${signals.dxy.change_20d.toFixed(1)}%`}
+                  status={signals.dxy.status}
+                  detail={`20D: ${signals.dxy.change_20d_pct >= 0 ? "+" : ""}${signals.dxy.change_20d_pct.toFixed(1)}%`}
                   color="blue"
                 />
               </div>
