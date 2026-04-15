@@ -416,3 +416,80 @@ export interface AccessRequestListItem extends AccessRequestInfo {
 export async function listAccessRequests(status: string = "Pending"): Promise<AccessRequestListItem[]> {
   return await callMethod<AccessRequestListItem[]>(`${AUTH_API}.list_access_requests`, { status });
 }
+
+// ──────────────────────────────────────────────
+// Pricebook & Pricing
+// ──────────────────────────────────────────────
+
+const PRICING_API = "hcp_replacement.hcp_replacement.api.pricing";
+
+export interface PricebookItem {
+  item_code: string;
+  item_name: string;
+  item_group: string;
+  cost: number;
+  valuation_rate: number;
+  last_purchase_rate: number;
+  standard_rate: number;
+  custom_selling_price: number;
+  custom_markup_pct: number;
+  computed_selling_price: number;
+  pricing_source: "exact" | "item_%" | "global_%" | "standard_rate" | "cost";
+}
+
+export interface PricebookResponse {
+  items: PricebookItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  global_markup_pct: number;
+}
+
+export interface UpdatePricingResponse {
+  item_code: string;
+  custom_selling_price: number;
+  custom_markup_pct: number;
+  computed_selling_price: number;
+  pricing_source: string;
+}
+
+export async function getPricebookList(
+  search: string = "",
+  page: number = 1,
+  pageSize: number = 50
+): Promise<PricebookResponse> {
+  return await callMethod<PricebookResponse>(`${PRICING_API}.get_pricebook_list`, {
+    search,
+    page,
+    page_size: pageSize,
+  });
+}
+
+export async function updateItemPricing(
+  itemCode: string,
+  sellingPrice?: number | null,
+  markupPct?: number | null
+): Promise<UpdatePricingResponse> {
+  const data: Record<string, unknown> = { item_code: itemCode };
+  if (sellingPrice !== undefined && sellingPrice !== null) data.selling_price = sellingPrice;
+  if (markupPct !== undefined && markupPct !== null) data.markup_pct = markupPct;
+  return await callMethod<UpdatePricingResponse>(`${PRICING_API}.update_item_pricing`, data);
+}
+
+export async function bulkUpdateMarkup(
+  itemCodes: string[],
+  markupPct: number
+): Promise<{ updated: number; markup_pct: number }> {
+  return await callMethod(`${PRICING_API}.bulk_update_markup`, {
+    item_codes: JSON.stringify(itemCodes),
+    markup_pct: markupPct,
+  });
+}
+
+export async function updateGlobalMarkup(
+  markupPct: number
+): Promise<{ materials_markup_pct: number }> {
+  return await callMethod(`${PRICING_API}.update_global_markup`, {
+    markup_pct: markupPct,
+  });
+}
