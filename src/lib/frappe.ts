@@ -493,3 +493,24 @@ export async function updateGlobalMarkup(
     markup_pct: markupPct,
   });
 }
+
+// ──────────────────────────────────────────────
+// Global Search
+// ──────────────────────────────────────────────
+
+export interface SearchResult {
+  job_name: string;
+  hcp_job_id: string;
+  customer_name: string;
+  address: string;
+  town: string;
+  status: string;
+  scheduled_date: string;
+  total_job_cost: number;
+  match_field: "job_number" | "customer" | "address" | "town" | "description" | "tech" | "other";
+}
+
+export async function globalSearch(query: string): Promise<SearchResult[]> {
+  if (!query || query.trim().length < 2) return [];
+  return await callMethod<SearchResult[]>(`${API}.global_search`, { query: query.trim() });
+}
