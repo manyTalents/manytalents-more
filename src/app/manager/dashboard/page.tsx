@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getAuth, clearAuth, getWorkflowCounts, type WorkflowCounts } from "@/lib/frappe";
+import { getAuth, clearAuth, getWorkflowCounts, globalSearch, type WorkflowCounts, type SearchResult } from "@/lib/frappe";
 
 interface PipelineCard {
   key: keyof WorkflowCounts;
@@ -62,6 +62,63 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
 
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  const handleSearch = useCallback((q: string) => {
+    setSearch(q);
+    clearTimeout(searchTimer.current);
+    if (q.trim().length < 2) {
+      setResults([]);
+      setSearchOpen(false);
+      return;
+    }
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const r = await globalSearch(q);
+        setResults(r);
+        setSearchOpen(true);
+      } catch {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const MATCH_LABELS: Record<string, string> = {
+    job_number: "Job #", customer: "Customer", address: "Address",
+    town: "Town", description: "Description", tech: "Tech", other: "",
+  };
+
+  const STATUS_COLORS: Record<string, string> = {
+    Entered: "bg-neutral-700 text-neutral-300",
+    Scheduled: "bg-blue-900/60 text-blue-300",
+    Assigned: "bg-indigo-900/60 text-indigo-300",
+    "In Progress": "bg-cyan-900/60 text-cyan-300",
+    "On Hold": "bg-amber-900/60 text-amber-300",
+    Completed: "bg-orange-900/60 text-orange-300",
+    "Needs Check": "bg-purple-900/60 text-purple-300",
+    Checked: "bg-blue-900/60 text-blue-300",
+    Invoiced: "bg-amber-900/60 text-amber-300",
+    Paid: "bg-emerald-900/60 text-emerald-300",
+  };
+
   useEffect(() => {
     if (!getAuth()) {
       router.replace("/manager");
@@ -82,8 +139,8 @@ export default function DashboardPage() {
     <div className="min-h-screen">
       {/* Nav */}
       <nav className="border-b border-navy-border bg-navy-surface/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <h1 className="text-xl font-serif font-extrabold">
               Many<span className="text-gold-gradient">Talents</span> Manager
             </h1>
@@ -91,38 +148,84 @@ export default function DashboardPage() {
               Office Dashboard
             </span>
           </div>
-          <div className="flex items-center gap-4">
+
+          {/* Search bar */}
+          <div ref={searchRef} className="relative flex-1 max-w-md hidden sm:block">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              onFocus={() => results.length > 0 && setSearchOpen(true)}
+              onKeyDown={(e) => e.key === "Escape" && setSearchOpen(false)}
+              placeholder="Search jobs, customers, addresses, techs..."
+              className="w-full bg-navy border border-navy-border rounded-lg px-4 py-2 text-sm text-cream placeholder-neutral-600 focus:outline-none focus:border-gold-dark transition"
+            />
+            {searching && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="h-4 w-4 rounded-full border-2 border-gold-dark border-t-transparent animate-spin" />
+              </div>
+            )}
+            {searchOpen && results.length > 0 && (
+              <div className="absolute top-full mt-1 left-0 right-0 bg-navy-surface border border-navy-border rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
+                {results.map((r) => (
+                  <Link
+                    key={r.job_name}
+                    href={`/manager/jobs/${r.job_name}`}
+                    onClick={() => { setSearchOpen(false); setSearch(""); }}
+                    className="block px-4 py-3 hover:bg-navy-card/50 transition border-b border-navy-border/30 last:border-0"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-cream text-sm truncate">
+                            {r.customer_name || "Unknown"}
+                          </span>
+                          <span className="text-xs text-gold">#{r.hcp_job_id}</span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${STATUS_COLORS[r.status] || "bg-neutral-700 text-neutral-300"}`}>
+                            {r.status}
+                          </span>
+                        </div>
+                        <p className="text-xs text-neutral-500 truncate mt-0.5">
+                          {r.address}{r.town ? `, ${r.town}` : ""}
+                        </p>
+                      </div>
+                      {MATCH_LABELS[r.match_field] && (
+                        <span className="text-xs text-neutral-600 flex-shrink-0">
+                          {MATCH_LABELS[r.match_field]}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+            {searchOpen && results.length === 0 && search.trim().length >= 2 && !searching && (
+              <div className="absolute top-full mt-1 left-0 right-0 bg-navy-surface border border-navy-border rounded-xl shadow-2xl z-50 p-4">
+                <p className="text-sm text-neutral-500 text-center">No results found</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-4 flex-shrink-0">
             <Link
-              href="/manager/jobs"
-              className="text-sm text-neutral-300 hover:text-gold-light transition"
+              href="/manager/jobs/new"
+              className="bg-gradient-to-br from-gold to-gold-dark text-navy font-bold px-4 py-2 rounded-lg text-sm hover:from-gold-light hover:to-gold transition"
             >
+              + New Job
+            </Link>
+            <Link href="/manager/jobs" className="text-sm text-neutral-300 hover:text-gold-light transition">
               All Jobs
             </Link>
-            <Link
-              href="/manager/pricing"
-              className="text-sm text-neutral-300 hover:text-gold-light transition"
-            >
+            <Link href="/manager/pricing" className="text-sm text-neutral-300 hover:text-gold-light transition">
               Pricing
             </Link>
-            <Link
-              href="/manager/admin/invite"
-              className="text-sm text-neutral-300 hover:text-gold-light transition"
-              title="Generate magic-link login for office staff"
-            >
+            <Link href="/manager/admin/invite" className="text-sm text-neutral-300 hover:text-gold-light transition hidden lg:inline" title="Generate magic-link login for office staff">
               Invite
             </Link>
-            <Link
-              href="/manager/admin/requests"
-              className="text-sm text-neutral-300 hover:text-gold-light transition"
-              title="Review access requests"
-            >
+            <Link href="/manager/admin/requests" className="text-sm text-neutral-300 hover:text-gold-light transition hidden lg:inline" title="Review access requests">
               Requests
             </Link>
-            <Link
-              href="/manager/admin/approvers"
-              className="text-sm text-neutral-300 hover:text-gold-light transition"
-              title="Manage who can approve access requests"
-            >
+            <Link href="/manager/admin/approvers" className="text-sm text-neutral-300 hover:text-gold-light transition hidden lg:inline" title="Manage who can approve access requests">
               Approvers
             </Link>
             <button
