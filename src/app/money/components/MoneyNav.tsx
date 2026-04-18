@@ -7,7 +7,7 @@ import { clearMoneyAuth } from "@/lib/money-auth";
 const TABS = [
   { href: "/money/hub", label: "Hub" },
   { href: "/money/veoe", label: "VEOE" },
-  { href: "/money/crypto", label: "Crypto" },
+  { href: "/money/crypto", label: "The Machine" },
 ];
 
 export default function MoneyNav() {
