@@ -4,6 +4,8 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getAuth, clearAuth, getWorkflowCounts, globalSearch, type WorkflowCounts, type SearchResult } from "@/lib/frappe";
+import EventBadge from "@/app/manager/components/EventBadge";
+import EventPanel from "@/app/manager/components/EventPanel";
 
 interface PipelineCard {
   key: keyof WorkflowCounts;
@@ -61,6 +63,7 @@ export default function DashboardPage() {
     paid_today: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [eventPanelOpen, setEventPanelOpen] = useState(false);
 
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -228,6 +231,7 @@ export default function DashboardPage() {
             <Link href="/manager/admin/approvers" className="text-sm text-neutral-300 hover:text-gold-light transition hidden lg:inline" title="Manage who can approve access requests">
               Approvers
             </Link>
+            <EventBadge onClick={() => setEventPanelOpen(true)} />
             <button
               onClick={handleLogout}
               className="text-sm text-neutral-400 hover:text-red-400 transition"
@@ -290,6 +294,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+
+      <EventPanel isOpen={eventPanelOpen} onClose={() => setEventPanelOpen(false)} />
     </div>
   );
 }
