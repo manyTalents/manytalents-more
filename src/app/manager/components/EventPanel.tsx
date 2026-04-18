@@ -78,7 +78,6 @@ export default function EventPanel({ isOpen, onClose }: Props) {
   const CHIPS: FilterChip[] = ["All", "Business", "System"];
 
   return (
-      {/* Panel — no overlay, coexists with page content */}
       <div
         className="fixed right-0 top-0 h-full w-80 bg-white shadow-[-4px_0_12px_rgba(0,0,0,0.15)] z-40 flex flex-col border-l border-neutral-200"
         role="dialog"
