@@ -217,10 +217,17 @@ export default function NewJobPage() {
       <nav className="border-b border-navy-border bg-navy-surface/80 backdrop-blur-xl sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-4">
           <Link
-            href="/manager/jobs"
+            href="/manager/dashboard"
             className="text-neutral-400 hover:text-gold-light transition"
           >
-            ← All Jobs
+            ← Dashboard
+          </Link>
+          <div className="h-5 w-px bg-navy-border" />
+          <Link
+            href="/manager/jobs"
+            className="text-neutral-400 hover:text-gold-light transition text-sm"
+          >
+            All Jobs
           </Link>
           <div className="h-5 w-px bg-navy-border" />
           <div>
