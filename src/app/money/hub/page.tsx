@@ -79,10 +79,10 @@ export default function HubPage() {
       error: errors.includes("VEOE API unreachable") ? "Unreachable" : null,
     },
     {
-      name: "Crypto Bot",
+      name: "The Machine",
       href: "/money/crypto",
-      label: "Crypto Trading",
-      mode: "live",
+      label: "Multi-Strategy Crypto",
+      mode: "paper",
       value: cryptoBalance?.total_usd || 0,
       pnl: cryptoStats?.total_pnl || 0,
       pnlPct: cryptoStats?.total_return_pct || 0,
@@ -140,7 +140,7 @@ export default function HubPage() {
         <MetricCard
           label="Active Strategies"
           value="2"
-          subValue="VEOE + Crypto"
+          subValue="VEOE + The Machine"
           loading={loading}
         />
       </div>
@@ -206,7 +206,7 @@ export default function HubPage() {
           <EquityChart data={veoeChartData} loading={loading} color="#c9a84c" />
         </div>
         <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
-          <h3 className="text-lg font-serif font-bold mb-4">Crypto Equity</h3>
+          <h3 className="text-lg font-serif font-bold mb-4">The Machine</h3>
           <EquityChart
             data={cryptoChartData}
             loading={loading}

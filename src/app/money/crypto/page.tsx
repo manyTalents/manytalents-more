@@ -93,7 +93,7 @@ export default function CryptoPage() {
         },
         () => setWsConnected(false)
       );
-      wsRef.current = ws;
+      if (ws) wsRef.current = ws;
     } catch {
       // WebSocket connection failed — REST polling handles it
     }
