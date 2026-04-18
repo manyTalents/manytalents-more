@@ -153,6 +153,8 @@ export async function createJob(params: {
   is_estimate?: boolean;
   occupant_name?: string;
   occupant_phone?: string;
+  is_vacant?: boolean;
+  keycode?: string;
   labor_hours?: number;
   labor_rate?: number;
   labor_description?: string;
@@ -160,6 +162,7 @@ export async function createJob(params: {
   return await callMethod(`${API}.create_job`, {
     ...params,
     is_estimate: params.is_estimate ? 1 : 0,
+    is_vacant: params.is_vacant ? 1 : 0,
   } as any);
 }
 

@@ -278,8 +278,21 @@ export default function DashboardPage() {
           ))}
         </div>
 
+        {/* Quick Actions */}
+        <div className="mt-12">
+          <Link
+            href="/manager/jobs/new"
+            className="inline-flex items-center gap-3 bg-gradient-to-br from-gold to-gold-dark text-navy font-bold px-6 py-3.5 rounded-xl text-sm hover:from-gold-light hover:to-gold transition shadow-lg shadow-gold-dark/20"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            New Job
+          </Link>
+        </div>
+
         {/* Placeholder for future widgets */}
-        <div className="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
             <h3 className="text-lg font-serif font-bold mb-2">Today&apos;s Activity</h3>
             <p className="text-sm text-neutral-500">

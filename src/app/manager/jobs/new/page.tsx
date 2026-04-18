@@ -50,6 +50,11 @@ export default function NewJobPage() {
   const [customerAddresses, setCustomerAddresses] = useState<string[]>([]);
   const addressTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  // Location extras
+  const [isVacant, setIsVacant] = useState(false);
+  const [keycode, setKeycode] = useState("");
+  const [keyAtOffice, setKeyAtOffice] = useState(false);
+
   // Job details
   const [description, setDescription] = useState("");
   const [selectedTrades, setSelectedTrades] = useState<Set<string>>(new Set());
@@ -189,6 +194,8 @@ export default function NewJobPage() {
         is_estimate: isEstimate,
         occupant_name: occupantName.trim(),
         occupant_phone: occupantPhone.replace(/\D/g, ""),
+        is_vacant: isVacant,
+        keycode: keycode.trim(),
         labor_hours: parseFloat(laborHours) || 0,
         labor_rate: parseFloat(laborRate) || 0,
         labor_description: laborDescription.trim(),
@@ -349,6 +356,49 @@ export default function NewJobPage() {
                 value={occupantName}
                 onChange={(e) => setOccupantName(e.target.value)}
                 placeholder="If different from customer"
+                className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
+              />
+            </div>
+          </div>
+
+          {/* Vacant + Keycode row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div className="flex flex-col gap-3">
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isVacant}
+                  onChange={(e) => setIsVacant(e.target.checked)}
+                  className="w-4 h-4 accent-gold-dark"
+                />
+                <span className="text-sm text-neutral-300">Vacant property</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={keyAtOffice}
+                  onChange={(e) => {
+                    setKeyAtOffice(e.target.checked);
+                    if (e.target.checked) setKeycode("Key at Office");
+                    else setKeycode("");
+                  }}
+                  className="w-4 h-4 accent-gold-dark"
+                />
+                <span className="text-sm text-neutral-300">K@O (Key at Office)</span>
+              </label>
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">
+                Keycode / Lockbox
+              </label>
+              <input
+                type="text"
+                value={keycode}
+                onChange={(e) => {
+                  setKeycode(e.target.value);
+                  if (keyAtOffice && e.target.value !== "Key at Office") setKeyAtOffice(false);
+                }}
+                placeholder="e.g. 1234, lockbox on fence"
                 className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
               />
             </div>
