@@ -243,7 +243,7 @@ export default function DashboardPage() {
       </nav>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-6 py-10">
+      <main className={`max-w-7xl mx-auto px-6 py-10 transition-all duration-200 ${eventPanelOpen ? "mr-80" : ""}`}>
         <div className="mb-10">
           <p className="text-xs uppercase tracking-widest text-gold mb-2">
             Office Pipeline
