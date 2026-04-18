@@ -51,7 +51,7 @@ export default function CryptoPage() {
         crypto.signals(),
         crypto.risk(),
         crypto.stats(),
-        crypto.trades(50),
+        crypto.trades(),
         crypto.learning(),
       ]);
       setBalance(b);
