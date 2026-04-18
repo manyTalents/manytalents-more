@@ -78,17 +78,9 @@ export default function EventPanel({ isOpen, onClose }: Props) {
   const CHIPS: FilterChip[] = ["All", "Business", "System"];
 
   return (
-    <>
-      {/* Backdrop */}
+      {/* Panel — no overlay, coexists with page content */}
       <div
-        className="fixed inset-0 bg-black/50 z-40"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Panel */}
-      <div
-        className="fixed right-0 top-0 h-full w-80 bg-white shadow-2xl z-50 flex flex-col"
+        className="fixed right-0 top-0 h-full w-80 bg-white shadow-[-4px_0_12px_rgba(0,0,0,0.15)] z-40 flex flex-col border-l border-neutral-200"
         role="dialog"
         aria-label="Events panel"
       >
@@ -204,7 +196,6 @@ export default function EventPanel({ isOpen, onClose }: Props) {
           </Link>
         </div>
       </div>
-    </>
   );
 }
 
