@@ -33,3 +33,10 @@ desktop.ini
 coverage/
 
 .vercel
+
+# Secrets — stored in Bitwarden
+.env.local
+.env.production
+*.pem
+*.key
+*credential*
