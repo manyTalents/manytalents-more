@@ -129,11 +129,12 @@ export const crypto = {
     }));
   },
   signals: async (): Promise<CryptoSignals> => ({
-    fear_greed: { value: 0, label: "N/A", date: "", trend: "" },
-    sopr: { value: 0, date: "", status: "" },
-    funding: { rate: 0, direction: "", instrument: "BTC-PERP-INTX" },
-    macro: { next_event: "", next_event_date: "", status: "", macro_score: 0 },
-  } as any),
+    fear_greed: { value: 0, label: "N/A", date: "", trend: "", action: "wait" },
+    sopr: { value: 0, ema_7d: 0, date: "", status: "N/A", sparkline: [], action: "wait" },
+    vix: { value: 0, date: "", status: "N/A", sparkline: [], action: "wait" },
+    dxy: { value: 0, date: "", change_20d_pct: 0, status: "N/A", sparkline: [], action: "wait" },
+    macro_filter: { trading_allowed: true, status: "ok", macro_score: 0 },
+  }),
   risk: async (): Promise<CryptoRisk> => {
     const d = await machineDashboard();
     const r = d.risk || {};
@@ -145,25 +146,30 @@ export const crypto = {
         : 0,
       drawdown_tier: r.is_killed ? "KILLED" : "normal",
       positions_open: (d.positions || []).length,
-      max_position_pct: 0,
-      limits: {
-        strategy_limit: { threshold: 3, current: 0, tripped: false },
+      positions_max: 10,
+      cash_reserve_pct: 20,
+      cash_reserve_ok: true,
+      today_pnl: 0,
+      today_pnl_pct: 0,
+      circuit_breakers: {
         daily_limit: { threshold: 5, current: 0, tripped: false },
         weekly_limit: { threshold: 10, current: 0, tripped: r.weekly_paused || false },
         monthly_limit: { threshold: 20, current: 0, tripped: r.monthly_paused || false },
       },
-    } as any;
+    };
   },
   stats: async (): Promise<CryptoStats> => ({
     total_return_pct: 0, total_trades: 0, win_rate: 0,
-    total_pnl: 0, total_fees: 0, avg_trade_pnl: 0,
-    max_win: 0, max_loss: 0, per_strategy: [],
-  } as any),
+    total_pnl: 0, total_fees: 0, avg_win: 0, avg_loss: 0,
+    starting_equity: 338.47, current_equity: 338.47,
+    monthly_returns: [],
+  }),
   learning: async (): Promise<CryptoLearning> => ({
     learner_active: false, confidence: "N/A",
     lesson_count: 0, bootstrap_count: 0, live_count: 0,
-    recent_lessons: [], blocked_pairs: [],
-  } as any),
+    overall_wr: 0, maker_wr: 0, taker_wr: 0,
+    top_pairs: [], bottom_pairs: [], blocked_pairs: [],
+  }),
   health: () => fetchJSON<{ status: string }>(`${BASE}/machine/health`),
 };
 
