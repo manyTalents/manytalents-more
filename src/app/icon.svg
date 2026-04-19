@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Navy badge background -->
+  <rect width="32" height="32" rx="5" ry="5" fill="#080c18"/>
+
+  <!-- "M" — occupies x:3–17, y:9–23 -->
+  <!-- Left vertical -->
+  <rect x="3" y="9" width="2.8" height="14" fill="#c9a84c"/>
+  <!-- Right vertical -->
+  <rect x="11.2" y="9" width="2.8" height="14" fill="#c9a84c"/>
+  <!-- Left diagonal (top-left to center) -->
+  <polygon points="3,9 5.8,9 8.5,14.5 5.7,14.5" fill="#c9a84c"/>
+  <!-- Right diagonal (center to top-right) -->
+  <polygon points="8.5,14.5 11.2,9 14,9 11.3,14.5" fill="#c9a84c"/>
+  <!-- Center peak fill -->
+  <polygon points="5.7,14.5 8.5,9.8 11.3,14.5" fill="#c9a84c"/>
+
+  <!-- "T" — occupies x:16–29, y:9–23 -->
+  <!-- Crossbar -->
+  <rect x="16" y="9" width="13" height="2.8" fill="#c9a84c"/>
+  <!-- Stem -->
+  <rect x="20.6" y="11.8" width="3.8" height="11.2" fill="#c9a84c"/>
+</svg>

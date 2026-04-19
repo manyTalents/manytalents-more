@@ -4,6 +4,14 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "ManyTalents Manager",
   description: "Office dashboard for field service businesses — jobs, inventory, invoicing.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/apple-icon.svg", type: "image/svg+xml" },
+    ],
+  },
 };
 
 export default function RootLayout({
