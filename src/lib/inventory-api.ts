@@ -223,5 +223,116 @@ export interface LimboResponse {
 }
 
 export async function fetchLimboItems(): Promise<LimboResponse> {
-  return callMethod<LimboResponse>(`${LIMBO_API}.get_limbo_items`);
+  return callMethod<LimboResponse>(`${LIMBO_API}.get_global_limbo`);
+}
+
+// ──────────────────────────────────────────────
+// Restock
+// ──────────────────────────────────────────────
+
+const RESTOCK_API = "hcp_replacement.hcp_replacement.api.restock";
+
+export type PullItemStatus = "Pending" | "Pulled" | "Accepted" | "Rejected" | "Ignored";
+
+export interface PullListItem {
+  name: string;
+  truck_warehouse: string;
+  truck_label: string;
+  item_code: string;
+  item_name: string;
+  required_qty: number;
+  pulled_qty: number;
+  status: PullItemStatus;
+  pulled_by: string;
+  pulled_at: string;
+  confirmed_by: string;
+  confirmed_at: string;
+  reject_note: string;
+  source_job: string;
+  source_job_id: string;
+}
+
+export interface TruckPullList {
+  warehouse: string;
+  label: string;
+  items: PullListItem[];
+  pending_count: number;
+  pulled_count: number;
+  rejected_count: number;
+}
+
+export interface PullListsResponse {
+  trucks: TruckPullList[];
+}
+
+export interface PullSummary {
+  pending: number;
+  pulled: number;
+  rejected: number;
+  total_active: number;
+}
+
+export async function fetchPullLists(date?: string): Promise<PullListsResponse> {
+  return callMethod<PullListsResponse>(`${RESTOCK_API}.get_pull_lists`, date ? { date } : {});
+}
+
+export async function generatePullList(date?: string): Promise<{ created: number; date: string }> {
+  return callMethod(`${RESTOCK_API}.generate_pull_list`, date ? { date } : {});
+}
+
+export async function markPulled(items: PullListItem[]): Promise<{ pulled: number }> {
+  return callMethod(`${RESTOCK_API}.mark_pulled`, {
+    items_json: JSON.stringify(items.map((i) => i.name)),
+  });
+}
+
+export async function acceptPullList(
+  truckWarehouse: string,
+  date?: string
+): Promise<{ accepted: number; stock_entry: string }> {
+  return callMethod(`${RESTOCK_API}.accept_pull_list`, {
+    truck_warehouse: truckWarehouse,
+    ...(date ? { date } : {}),
+  });
+}
+
+export async function rejectPullItem(
+  name: string,
+  rejectNote: string
+): Promise<{ status: string }> {
+  return callMethod(`${RESTOCK_API}.reject_pull_item`, { name, reject_note: rejectNote });
+}
+
+export async function resolveRejection(
+  name: string,
+  newItemCode?: string,
+  newQty?: number
+): Promise<{ resolved: boolean }> {
+  return callMethod(`${RESTOCK_API}.resolve_rejection`, {
+    name,
+    ...(newItemCode ? { new_item_code: newItemCode } : {}),
+    ...(newQty !== undefined ? { new_qty: newQty } : {}),
+  });
+}
+
+export async function ignorePullItem(name: string): Promise<{ status: string }> {
+  return callMethod(`${RESTOCK_API}.ignore_pull_item`, { name });
+}
+
+export async function addToPullList(
+  truckWarehouse: string,
+  itemCode: string,
+  qty: number,
+  date?: string
+): Promise<{ name: string }> {
+  return callMethod(`${RESTOCK_API}.add_to_pull_list`, {
+    truck_warehouse: truckWarehouse,
+    item_code: itemCode,
+    qty,
+    ...(date ? { date } : {}),
+  });
+}
+
+export async function fetchPullSummary(): Promise<PullSummary> {
+  return callMethod<PullSummary>(`${RESTOCK_API}.get_pull_summary`);
 }

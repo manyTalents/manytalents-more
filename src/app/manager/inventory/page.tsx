@@ -12,6 +12,12 @@ import {
   fetchLimboItems,
   dispatchItems,
   dispatchAllToJob,
+  fetchPullLists,
+  generatePullList,
+  markPulled,
+  ignorePullItem,
+  resolveRejection,
+  fetchPullSummary,
   type ReceiptRow,
   type ReceiptDetail,
   type ReceiptItem,
@@ -23,13 +29,16 @@ import {
   type LimboGroup,
   type ItemDestination,
   type DispatchItemInput,
+  type TruckPullList,
+  type PullListItem,
+  type PullSummary,
 } from "@/lib/inventory-api";
 
 // ──────────────────────────────────────────────
 // Constants
 // ──────────────────────────────────────────────
 
-type MainTab = "receipts" | "warehouses" | "limbo";
+type MainTab = "receipts" | "warehouses" | "limbo" | "restock";
 type StatusFilter = "" | "Pending" | "Complete" | "Failed";
 type ViewMode = "table" | "cards";
 
@@ -1171,6 +1180,546 @@ function LimboTab() {
 }
 
 // ──────────────────────────────────────────────
+// RESTOCK TAB
+// ──────────────────────────────────────────────
+
+// Swap-item modal — simple item code + qty entry to resolve a rejection
+interface SwapModalProps {
+  item: PullListItem;
+  onConfirm: (newItemCode: string, newQty: number) => Promise<void>;
+  onClose: () => void;
+}
+
+function SwapModal({ item, onConfirm, onClose }: SwapModalProps) {
+  const [itemCode, setItemCode] = useState(item.item_code);
+  const [qty, setQty] = useState(String(item.required_qty));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async () => {
+    const parsedQty = parseFloat(qty);
+    if (!itemCode.trim() || isNaN(parsedQty) || parsedQty <= 0) {
+      setError("Enter a valid item code and quantity.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onConfirm(itemCode.trim(), parsedQty);
+      onClose();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to resolve.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+      <div className="bg-[#0d1120] border border-[#1a1f32] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+        <h3 className="text-white font-serif font-bold text-lg mb-1">Swap Item</h3>
+        <p className="text-neutral-400 text-xs mb-5">
+          Replacing: <span className="text-[#f0ebe0]">{item.item_name}</span>
+          {item.reject_note && (
+            <span className="block mt-1 text-[#dc3545] italic">"{item.reject_note}"</span>
+          )}
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-1.5">
+              New Item Code
+            </label>
+            <input
+              type="text"
+              value={itemCode}
+              onChange={(e) => setItemCode(e.target.value)}
+              placeholder="e.g. PEX-34-TEE-34-12-34"
+              className="w-full bg-[#080c18] border border-[#1a1f32] rounded-lg px-3 py-2.5 text-sm text-[#f0ebe0] placeholder-neutral-600 focus:outline-none focus:border-[#c9a84c] transition"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-1.5">
+              Qty
+            </label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              className="w-full bg-[#080c18] border border-[#1a1f32] rounded-lg px-3 py-2.5 text-sm text-[#f0ebe0] placeholder-neutral-600 focus:outline-none focus:border-[#c9a84c] transition"
+            />
+          </div>
+        </div>
+
+        {error && <p className="text-[#dc3545] text-xs mt-3">{error}</p>}
+
+        <div className="flex items-center gap-3 mt-6">
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-br from-[#c9a84c] to-[#a8893d] text-[#080c18] font-bold px-4 py-2.5 rounded-xl text-sm hover:from-[#e0c068] hover:to-[#c9a84c] transition disabled:opacity-50"
+          >
+            {saving ? <Spinner size="sm" /> : "CONFIRM SWAP"}
+          </button>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2.5 bg-[#1a1f32] text-neutral-400 hover:text-white rounded-xl text-sm font-semibold transition disabled:opacity-40"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Single truck collapsible section
+interface TruckSectionProps {
+  truck: TruckPullList;
+  onPullItem: (item: PullListItem) => Promise<void>;
+  onPullAll: (truck: TruckPullList) => Promise<void>;
+  pullingItems: Record<string, boolean>;
+  pullingAll: Record<string, boolean>;
+}
+
+function TruckSection({ truck, onPullItem, onPullAll, pullingItems, pullingAll }: TruckSectionProps) {
+  const [collapsed, setCollapsed] = useState(false);
+  const pendingItems = truck.items.filter((i) => i.status === "Pending");
+
+  return (
+    <div className="bg-[#0d1120] border border-[#1a1f32] rounded-2xl overflow-hidden">
+      {/* Header */}
+      <button
+        onClick={() => setCollapsed((v) => !v)}
+        className="w-full flex items-center gap-4 px-5 py-4 hover:bg-[#111627] transition text-left"
+      >
+        <div className="flex-1 min-w-0">
+          <p className="font-serif font-bold text-white text-base leading-tight">
+            {truck.label || truck.warehouse}
+          </p>
+          <div className="flex items-center gap-3 mt-0.5 text-xs text-neutral-500">
+            {truck.pending_count > 0 && (
+              <span className="text-[#E67E22] font-semibold">{truck.pending_count} pending</span>
+            )}
+            {truck.pulled_count > 0 && (
+              <span className="text-[#28a745] font-semibold">{truck.pulled_count} pulled</span>
+            )}
+            {truck.rejected_count > 0 && (
+              <span className="text-[#dc3545] font-semibold">{truck.rejected_count} rejected</span>
+            )}
+          </div>
+        </div>
+        <span className="text-xs text-neutral-500 flex-shrink-0">
+          {truck.items.length} item{truck.items.length !== 1 ? "s" : ""}
+        </span>
+        <svg
+          className={`w-4 h-4 text-neutral-500 flex-shrink-0 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {!collapsed && (
+        <div className="border-t border-[#1a1f32]">
+          {truck.items.filter((i) => i.status !== "Rejected" && i.status !== "Ignored").map((item, idx) => {
+            const isLast = idx === truck.items.filter((i) => i.status !== "Rejected" && i.status !== "Ignored").length - 1;
+            const isPulled = item.status === "Pulled" || item.status === "Accepted";
+            const isPending = item.status === "Pending";
+
+            return (
+              <div
+                key={item.name}
+                className={`flex items-center gap-3 px-5 py-3.5 ${!isLast ? "border-b border-[#1a1f32]" : ""} ${
+                  isPulled ? "opacity-60" : "hover:bg-[#111627]"
+                } transition`}
+              >
+                {/* Checkbox visual (reflects status, not interactive) */}
+                <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
+                  isPulled
+                    ? "bg-[#28a745] border-[#28a745]"
+                    : "border-[#2a3050] bg-transparent"
+                }`}>
+                  {isPulled && (
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+
+                {/* Item info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-[#f0ebe0] font-medium leading-tight">
+                    {item.item_name}
+                    {item.source_job_id && (
+                      <span className="ml-2 text-[11px] text-[#c9a84c] font-mono">#{item.source_job_id}</span>
+                    )}
+                  </p>
+                  {item.pulled_by && isPulled && (
+                    <p className="text-[11px] text-neutral-500 mt-0.5">by {item.pulled_by}</p>
+                  )}
+                </div>
+
+                {/* Qty */}
+                <span className="text-sm font-mono text-neutral-400 flex-shrink-0">
+                  x{item.required_qty}
+                </span>
+
+                {/* Action */}
+                <div className="flex-shrink-0">
+                  {isPulled ? (
+                    <span className="text-xs font-bold text-[#28a745] flex items-center gap-1">
+                      PULLED
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </span>
+                  ) : isPending ? (
+                    <button
+                      onClick={() => onPullItem(item)}
+                      disabled={!!pullingItems[item.name]}
+                      className="min-h-[32px] px-3 py-1 bg-gradient-to-br from-[#c9a84c] to-[#a8893d] text-[#080c18] font-bold rounded-lg text-xs hover:from-[#e0c068] hover:to-[#c9a84c] transition disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {pullingItems[item.name] ? <Spinner size="sm" /> : "PULL"}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Pull all footer */}
+          {pendingItems.length > 1 && (
+            <div className="px-5 py-3 border-t border-[#1a1f32] flex justify-end">
+              <button
+                onClick={() => onPullAll(truck)}
+                disabled={!!pullingAll[truck.warehouse]}
+                className="flex items-center gap-2 px-4 py-2 bg-[#1a1f32] text-neutral-300 hover:text-[#c9a84c] hover:border-[#c9a84c]/40 border border-[#1a1f32] rounded-xl text-xs font-bold transition disabled:opacity-50"
+              >
+                {pullingAll[truck.warehouse] ? <Spinner size="sm" /> : null}
+                PULL ALL AVAILABLE
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RestockTab() {
+  const [trucks, setTrucks] = useState<TruckPullList[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [pullingItems, setPullingItems] = useState<Record<string, boolean>>({});
+  const [pullingAll, setPullingAll] = useState<Record<string, boolean>>({});
+  const [swapTarget, setSwapTarget] = useState<PullListItem | null>(null);
+  const [ignoringItems, setIgnoringItems] = useState<Record<string, boolean>>({});
+  const [toast, setToast] = useState("");
+  const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3500);
+  };
+
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const res = await fetchPullLists();
+      // Sort trucks: most pending items first
+      const sorted = [...(res.trucks || [])].sort(
+        (a, b) => b.pending_count - a.pending_count
+      );
+      setTrucks(sorted);
+      setError("");
+    } catch (e: unknown) {
+      if (!silent) setError(e instanceof Error ? e.message : "Failed to load pull lists.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial load + 60-second auto-poll
+  useEffect(() => {
+    loadData();
+    pollRef.current = setInterval(() => loadData(true), 60_000);
+    return () => clearInterval(pollRef.current);
+  }, [loadData]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await generatePullList();
+      await loadData(true);
+      showToast("Pull list regenerated.");
+    } catch (e: unknown) {
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handlePullItem = async (item: PullListItem) => {
+    setPullingItems((s) => ({ ...s, [item.name]: true }));
+    try {
+      await markPulled([item]);
+      // Optimistic update
+      setTrucks((prev) =>
+        prev.map((t) => ({
+          ...t,
+          items: t.items.map((i) =>
+            i.name === item.name ? { ...i, status: "Pulled" as const } : i
+          ),
+          pending_count: t.warehouse === item.truck_warehouse ? t.pending_count - 1 : t.pending_count,
+          pulled_count: t.warehouse === item.truck_warehouse ? t.pulled_count + 1 : t.pulled_count,
+        }))
+      );
+      showToast(`Marked pulled: ${item.item_name}`);
+    } catch (e: unknown) {
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setPullingItems((s) => ({ ...s, [item.name]: false }));
+    }
+  };
+
+  const handlePullAll = async (truck: TruckPullList) => {
+    const pendingItems = truck.items.filter((i) => i.status === "Pending");
+    if (pendingItems.length === 0) return;
+    setPullingAll((s) => ({ ...s, [truck.warehouse]: true }));
+    try {
+      await markPulled(pendingItems);
+      setTrucks((prev) =>
+        prev.map((t) => {
+          if (t.warehouse !== truck.warehouse) return t;
+          return {
+            ...t,
+            items: t.items.map((i) =>
+              i.status === "Pending" ? { ...i, status: "Pulled" as const } : i
+            ),
+            pending_count: 0,
+            pulled_count: t.pulled_count + pendingItems.length,
+          };
+        })
+      );
+      showToast(`Marked ${pendingItems.length} items pulled for ${truck.label || truck.warehouse}.`);
+    } catch (e: unknown) {
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setPullingAll((s) => ({ ...s, [truck.warehouse]: false }));
+    }
+  };
+
+  const handleIgnore = async (item: PullListItem) => {
+    setIgnoringItems((s) => ({ ...s, [item.name]: true }));
+    try {
+      await ignorePullItem(item.name);
+      setTrucks((prev) =>
+        prev.map((t) => ({
+          ...t,
+          items: t.items.map((i) =>
+            i.name === item.name ? { ...i, status: "Ignored" as const } : i
+          ),
+          rejected_count:
+            t.warehouse === item.truck_warehouse && item.status === "Rejected"
+              ? t.rejected_count - 1
+              : t.rejected_count,
+        }))
+      );
+      showToast("Item ignored.");
+    } catch (e: unknown) {
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setIgnoringItems((s) => ({ ...s, [item.name]: false }));
+    }
+  };
+
+  const handleResolveSwap = async (newItemCode: string, newQty: number) => {
+    if (!swapTarget) return;
+    await resolveRejection(swapTarget.name, newItemCode, newQty);
+    setTrucks((prev) =>
+      prev.map((t) => ({
+        ...t,
+        items: t.items.map((i) =>
+          i.name === swapTarget.name
+            ? { ...i, item_code: newItemCode, required_qty: newQty, status: "Pending" as const, reject_note: "" }
+            : i
+        ),
+        rejected_count:
+          t.warehouse === swapTarget.truck_warehouse ? t.rejected_count - 1 : t.rejected_count,
+        pending_count:
+          t.warehouse === swapTarget.truck_warehouse ? t.pending_count + 1 : t.pending_count,
+      }))
+    );
+    showToast("Rejection resolved — item re-queued as Pending.");
+    setSwapTarget(null);
+  };
+
+  // All rejected items across all trucks (not Ignored)
+  const allRejected = trucks.flatMap((t) =>
+    t.items.filter((i) => i.status === "Rejected")
+  );
+
+  const totalItems = trucks.reduce((s, t) => s + t.items.length, 0);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-24">
+        <p className="text-[#dc3545] text-sm">{error}</p>
+        <button
+          onClick={() => loadData()}
+          className="px-4 py-2 bg-[#1a1f32] text-neutral-300 rounded-xl text-xs font-semibold hover:text-white transition"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#0d1120] border border-[#c9a84c]/50 text-[#c9a84c] text-sm px-5 py-3 rounded-xl shadow-2xl pointer-events-none">
+          {toast}
+        </div>
+      )}
+
+      {/* Swap modal */}
+      {swapTarget && (
+        <SwapModal
+          item={swapTarget}
+          onConfirm={handleResolveSwap}
+          onClose={() => setSwapTarget(null)}
+        />
+      )}
+
+      {/* Header row */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div>
+          <h2 className="text-white font-serif font-bold text-xl">Restock</h2>
+          {trucks.length > 0 && (
+            <p className="text-xs text-neutral-500 mt-0.5">
+              Pull lists for today &middot; {totalItems} item{totalItems !== 1 ? "s" : ""} across {trucks.length} truck{trucks.length !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-br from-[#c9a84c] to-[#a8893d] text-[#080c18] font-bold rounded-xl text-xs hover:from-[#e0c068] hover:to-[#c9a84c] transition disabled:opacity-50 self-start sm:self-auto"
+        >
+          {refreshing ? <Spinner size="sm" /> : (
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          )}
+          Refresh Now
+        </button>
+      </div>
+
+      {/* Empty state */}
+      {trucks.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="h-16 w-16 rounded-full bg-[#28a745]/10 flex items-center justify-center mb-4">
+            <svg className="w-8 h-8 text-[#28a745]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          </div>
+          <p className="text-white font-semibold mb-1">No pull lists today</p>
+          <p className="text-neutral-400 text-sm mb-5">Hit Refresh Now to generate pull lists from today's jobs.</p>
+        </div>
+      )}
+
+      {/* Truck sections */}
+      {trucks.length > 0 && (
+        <div className="space-y-4 mb-8">
+          {trucks.map((truck) => (
+            <TruckSection
+              key={truck.warehouse}
+              truck={truck}
+              onPullItem={handlePullItem}
+              onPullAll={handlePullAll}
+              pullingItems={pullingItems}
+              pullingAll={pullingAll}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Rejections section */}
+      {allRejected.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-xs font-bold text-[#dc3545] uppercase tracking-wider">
+              Rejections ({allRejected.length})
+            </span>
+            <div className="flex-1 h-px bg-[#1a1f32]" />
+          </div>
+
+          <div className="bg-[#0d1120] border border-[#dc3545]/30 rounded-2xl overflow-hidden">
+            {allRejected.map((item, idx) => (
+              <div
+                key={item.name}
+                className={`flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 ${
+                  idx < allRejected.length - 1 ? "border-b border-[#1a1f32]" : ""
+                } hover:bg-[#111627] transition`}
+              >
+                {/* Rejection X icon */}
+                <div className="w-5 h-5 rounded-full bg-[#dc3545]/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-3 h-3 text-[#dc3545]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-[#f0ebe0] font-medium leading-tight">
+                    {item.truck_label || item.truck_warehouse} rejected: {item.item_name}
+                  </p>
+                  {item.reject_note && (
+                    <p className="text-[11px] text-[#dc3545] italic mt-0.5">"{item.reject_note}"</p>
+                  )}
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    x{item.required_qty} &middot; {item.item_code}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => setSwapTarget(item)}
+                    className="min-h-[32px] px-3 py-1.5 bg-gradient-to-br from-[#c9a84c] to-[#a8893d] text-[#080c18] font-bold rounded-lg text-xs hover:from-[#e0c068] hover:to-[#c9a84c] transition"
+                  >
+                    SWAP ITEM
+                  </button>
+                  <button
+                    onClick={() => handleIgnore(item)}
+                    disabled={!!ignoringItems[item.name]}
+                    className="min-h-[32px] px-3 py-1.5 bg-[#1a1f32] text-neutral-400 hover:text-white border border-[#1a1f32] rounded-lg text-xs font-semibold transition disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {ignoringItems[item.name] ? <Spinner size="sm" /> : "IGNORE"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
 // MAIN PAGE
 // ──────────────────────────────────────────────
 
@@ -1178,6 +1727,7 @@ export default function InventoryPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<MainTab>("receipts");
   const [summary, setSummary] = useState({ pending_receipts: 0, pending_limbo_items: 0, restock_items: 0 });
+  const [restockBadge, setRestockBadge] = useState(0);
 
   useEffect(() => {
     if (!getAuth()) {
@@ -1185,9 +1735,12 @@ export default function InventoryPage() {
       return;
     }
     // Fetch summary for badge counts
-    import("@/lib/inventory-api").then(({ fetchInventorySummary }) => {
+    import("@/lib/inventory-api").then(({ fetchInventorySummary, fetchPullSummary }) => {
       fetchInventorySummary()
         .then(setSummary)
+        .catch(() => {/* non-critical */});
+      fetchPullSummary()
+        .then((s: PullSummary) => setRestockBadge(s.pending + s.rejected))
         .catch(() => {/* non-critical */});
     });
   }, [router]);
@@ -1196,6 +1749,7 @@ export default function InventoryPage() {
     { key: "receipts", label: "RECEIPTS", badge: summary.pending_receipts || undefined },
     { key: "warehouses", label: "WAREHOUSES" },
     { key: "limbo", label: "LIMBO", badge: summary.pending_limbo_items || undefined },
+    { key: "restock", label: "RESTOCK", badge: restockBadge || undefined },
   ];
 
   return (
@@ -1263,6 +1817,7 @@ export default function InventoryPage() {
         {activeTab === "receipts" && <ReceiptsTab />}
         {activeTab === "warehouses" && <WarehousesTab />}
         {activeTab === "limbo" && <LimboTab />}
+        {activeTab === "restock" && <RestockTab />}
       </main>
     </div>
   );
