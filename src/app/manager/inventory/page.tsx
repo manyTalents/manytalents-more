@@ -24,6 +24,11 @@ import {
   approveMatch,
   bulkApprove,
   markNotItem,
+  submitNewPart,
+  fetchPendingParts,
+  approveNewPart,
+  rejectNewPart,
+  getConfidenceTier,
   type ReceiptRow,
   type ReceiptDetail,
   type ReceiptItem,
@@ -40,6 +45,7 @@ import {
   type PullSummary,
   type UnmatchedItem,
   type PricebookResult,
+  type PricebookRequest,
 } from "@/lib/inventory-api";
 
 // ──────────────────────────────────────────────
@@ -1865,6 +1871,413 @@ function PricebookSearch({ onSelect, onCancel }: PricebookSearchProps) {
 }
 
 // ──────────────────────────────────────────────
+// NEW PART MODAL
+// ──────────────────────────────────────────────
+
+const TRADES = ["Plumbing", "Electrical", "HVAC", "General"] as const;
+type Trade = (typeof TRADES)[number];
+
+interface NewPartModalProps {
+  prefillDescription: string;
+  prefillSupplierCode: string;
+  prefillSupplier: string;
+  receiptItem: string;
+  onSuccess: () => void;
+  onClose: () => void;
+  showToast: (msg: string) => void;
+}
+
+function NewPartModal({
+  prefillDescription,
+  prefillSupplierCode,
+  prefillSupplier,
+  receiptItem,
+  onSuccess,
+  onClose,
+  showToast,
+}: NewPartModalProps) {
+  const [partName, setPartName] = useState(prefillDescription);
+  const [trade, setTrade] = useState<Trade>("Plumbing");
+  const [size, setSize] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!partName.trim()) return;
+    setSubmitting(true);
+    try {
+      await submitNewPart({
+        part_name: partName.trim(),
+        trade,
+        size: size.trim() || undefined,
+        supplier_code: prefillSupplierCode || undefined,
+        supplier: prefillSupplier || undefined,
+        receipt_item: receiptItem || undefined,
+      });
+      showToast("New part request sent to office for review.");
+      onSuccess();
+    } catch (e: unknown) {
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+      <div className="bg-[#0d1120] border border-[#1a1f32] rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-white font-serif font-bold text-lg">New Part Request</h3>
+          <button
+            onClick={onClose}
+            className="text-neutral-500 hover:text-white transition"
+            aria-label="Close"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-1.5">
+              Part Name <span className="text-[#dc3545]">*</span>
+            </label>
+            <input
+              type="text"
+              value={partName}
+              onChange={(e) => setPartName(e.target.value)}
+              className="w-full bg-[#111627] border border-[#1a1f32] rounded-lg px-3 py-2.5 text-sm text-[#f0ebe0] placeholder-neutral-600 focus:outline-none focus:border-[#c9a84c]/60 transition"
+              placeholder="e.g. 3/4 Ball Valve"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-1.5">
+              Trade <span className="text-[#dc3545]">*</span>
+            </label>
+            <select
+              value={trade}
+              onChange={(e) => setTrade(e.target.value as Trade)}
+              className="w-full bg-[#111627] border border-[#1a1f32] rounded-lg px-3 py-2.5 text-sm text-[#f0ebe0] focus:outline-none focus:border-[#c9a84c]/60 transition"
+            >
+              {TRADES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-1.5">
+              Size <span className="text-neutral-600">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={size}
+              onChange={(e) => setSize(e.target.value)}
+              className="w-full bg-[#111627] border border-[#1a1f32] rounded-lg px-3 py-2.5 text-sm text-[#f0ebe0] placeholder-neutral-600 focus:outline-none focus:border-[#c9a84c]/60 transition"
+              placeholder="e.g. 3/4&quot;"
+            />
+          </div>
+
+          <p className="text-xs text-neutral-500 italic border-l-2 border-[#c9a84c]/30 pl-3">
+            This will be sent to the office for review before being added to the pricebook.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 bg-[#1a1f32] text-neutral-300 hover:text-white rounded-xl text-sm font-semibold transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || !partName.trim()}
+            className="flex-1 px-4 py-2.5 bg-[#E67E22] hover:bg-[#D35400] text-white rounded-xl text-sm font-bold transition disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {submitting ? <Spinner size="sm" /> : null}
+            Submit Request
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
+// PENDING PARTS SECTION
+// ──────────────────────────────────────────────
+
+function PendingPartsSection({ showToast }: { showToast: (msg: string) => void }) {
+  const [pendingParts, setPendingParts] = useState<PricebookRequest[]>([]);
+  const [loadingPending, setLoadingPending] = useState(true);
+  const [pendingTotal, setPendingTotal] = useState(0);
+  const [rejectingRow, setRejectingRow] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [approvingRow, setApprovingRow] = useState<string | null>(null);
+  const [approveSearch, setApproveSearch] = useState("");
+  const [approveResults, setApproveResults] = useState<PricebookResult[]>([]);
+  const [approveSearching, setApproveSearching] = useState(false);
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setLoadingPending(true);
+    fetchPendingParts(1, 50)
+      .then((res) => {
+        setPendingParts(res.items || []);
+        setPendingTotal(res.total_count);
+      })
+      .catch(() => {/* non-critical */})
+      .finally(() => setLoadingPending(false));
+  }, []);
+
+  const handleApprove = async (req: PricebookRequest, itemCode?: string) => {
+    setActionLoading((s) => ({ ...s, [req.name]: true }));
+    try {
+      await approveNewPart(req.name, itemCode);
+      setPendingParts((prev) => prev.filter((p) => p.name !== req.name));
+      setPendingTotal((n) => Math.max(0, n - 1));
+      setApprovingRow(null);
+      showToast(`Part "${req.part_name}" approved.`);
+    } catch (e: unknown) {
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+    } finally {
+      setActionLoading((s) => ({ ...s, [req.name]: false }));
+    }
+  };
+
+  const handleReject = async (req: PricebookRequest) => {
+    setActionLoading((s) => ({ ...s, [`rej_${req.name}`]: true }));
+    try {
+      await rejectNewPart(req.name, rejectReason.trim() || undefined);
+      setPendingParts((prev) => prev.filter((p) => p.name !== req.name));
+      setPendingTotal((n) => Math.max(0, n - 1));
+      setRejectingRow(null);
+      setRejectReason("");
+      showToast(`Part "${req.part_name}" rejected.`);
+    } catch (e: unknown) {
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+    } finally {
+      setActionLoading((s) => ({ ...s, [`rej_${req.name}`]: false }));
+    }
+  };
+
+  const handleApproveSearch = async (q: string) => {
+    setApproveSearch(q);
+    if (!q.trim()) { setApproveResults([]); return; }
+    setApproveSearching(true);
+    try {
+      const res = await searchPricebook(q, 8);
+      setApproveResults(res);
+    } catch {
+      setApproveResults([]);
+    } finally {
+      setApproveSearching(false);
+    }
+  };
+
+  if (loadingPending) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Spinner size="sm" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-center gap-3 mb-4">
+        <h2 className="text-white font-serif font-bold text-xl">Pending Parts</h2>
+        {pendingTotal > 0 && (
+          <span className="bg-[#E67E22] text-white text-[11px] font-bold rounded-full min-w-[22px] h-[22px] inline-flex items-center justify-center px-1.5">
+            {pendingTotal > 99 ? "99+" : pendingTotal}
+          </span>
+        )}
+      </div>
+
+      {pendingParts.length === 0 ? (
+        <p className="text-neutral-500 text-sm italic">No pending part requests.</p>
+      ) : (
+        <div className="bg-[#0d1120] border border-[#1a1f32] rounded-2xl overflow-hidden">
+          <div className="hidden md:grid grid-cols-[1fr_100px_80px_120px_120px_160px] gap-0 border-b border-[#1a1f32]">
+            {["PART NAME", "TRADE", "SIZE", "SUPPLIER", "SUBMITTED BY", "ACTIONS"].map((h) => (
+              <div key={h} className="px-3 py-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
+                {h}
+              </div>
+            ))}
+          </div>
+
+          {pendingParts.map((req) => {
+            const isApproving = approvingRow === req.name;
+            const isRejecting = rejectingRow === req.name;
+            const isActionLoading = !!actionLoading[req.name];
+            const isRejectLoading = !!actionLoading[`rej_${req.name}`];
+
+            return (
+              <div key={req.name} className="border-b border-[#1a1f32] last:border-0">
+                {/* Desktop */}
+                <div className="hidden md:grid grid-cols-[1fr_100px_80px_120px_120px_160px] gap-0 px-0 py-3 items-start">
+                  <div className="px-3">
+                    <p className="text-sm text-[#f0ebe0] leading-snug">{req.part_name}</p>
+                    <p className="text-[10px] text-neutral-600 mt-0.5">{fmtDate(req.creation)}</p>
+                  </div>
+                  <div className="px-3">
+                    <span className="text-xs text-neutral-300">{req.trade || "—"}</span>
+                  </div>
+                  <div className="px-3">
+                    <span className="text-xs text-neutral-400">{req.size || "—"}</span>
+                  </div>
+                  <div className="px-3">
+                    <span className="text-xs text-neutral-300">{req.supplier || "—"}</span>
+                  </div>
+                  <div className="px-3">
+                    <span className="text-xs text-neutral-300">{req.submitted_by || "—"}</span>
+                  </div>
+                  <div className="px-3 flex items-center gap-1.5">
+                    <button
+                      onClick={() => { setApprovingRow(isApproving ? null : req.name); setRejectingRow(null); setApproveSearch(""); setApproveResults([]); }}
+                      disabled={isActionLoading || isRejectLoading}
+                      className="min-h-[30px] px-2.5 py-1 bg-[#1a1f32] border border-[#28a745]/30 text-[#28a745] hover:bg-[#28a745]/10 rounded-lg text-[11px] font-bold transition disabled:opacity-40"
+                    >
+                      APPROVE
+                    </button>
+                    <button
+                      onClick={() => { setRejectingRow(isRejecting ? null : req.name); setApprovingRow(null); setRejectReason(""); }}
+                      disabled={isActionLoading || isRejectLoading}
+                      className="min-h-[30px] px-2.5 py-1 bg-[#1a1f32] border border-[#dc3545]/30 text-[#dc3545] hover:bg-[#dc3545]/10 rounded-lg text-[11px] font-bold transition disabled:opacity-40"
+                    >
+                      {isRejectLoading ? <Spinner size="sm" /> : "REJECT"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mobile */}
+                <div className="md:hidden px-4 py-4">
+                  <p className="text-sm text-[#f0ebe0] font-semibold">{req.part_name}</p>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-[11px] text-neutral-500">
+                    {req.trade && <span>{req.trade}</span>}
+                    {req.size && <span>{req.size}</span>}
+                    {req.supplier && <span>{req.supplier}</span>}
+                    <span>{fmtDate(req.creation)}</span>
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => { setApprovingRow(isApproving ? null : req.name); setRejectingRow(null); setApproveSearch(""); setApproveResults([]); }}
+                      disabled={isActionLoading || isRejectLoading}
+                      className="flex-1 min-h-[34px] bg-[#1a1f32] border border-[#28a745]/30 text-[#28a745] rounded-lg text-xs font-bold transition disabled:opacity-40"
+                    >
+                      APPROVE
+                    </button>
+                    <button
+                      onClick={() => { setRejectingRow(isRejecting ? null : req.name); setApprovingRow(null); setRejectReason(""); }}
+                      disabled={isActionLoading || isRejectLoading}
+                      className="flex-1 min-h-[34px] bg-[#1a1f32] border border-[#dc3545]/30 text-[#dc3545] rounded-lg text-xs font-bold transition disabled:opacity-40"
+                    >
+                      {isRejectLoading ? <Spinner size="sm" /> : "REJECT"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Approve panel — optional pricebook search to link existing item */}
+                {isApproving && (
+                  <div className="px-4 pb-4 bg-[#111627] border-t border-[#1a1f32]">
+                    <p className="text-xs text-neutral-400 mt-3 mb-2">
+                      Optionally link to an existing pricebook item, or approve as new:
+                    </p>
+                    <div className="relative mb-3">
+                      <input
+                        type="text"
+                        value={approveSearch}
+                        onChange={(e) => handleApproveSearch(e.target.value)}
+                        className="w-full bg-[#0d1120] border border-[#1a1f32] rounded-lg px-3 py-2 text-sm text-[#f0ebe0] placeholder-neutral-600 focus:outline-none focus:border-[#c9a84c]/60 transition pr-8"
+                        placeholder="Search pricebook (optional)..."
+                      />
+                      {approveSearching && (
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                          <Spinner size="sm" />
+                        </div>
+                      )}
+                    </div>
+                    {approveResults.length > 0 && (
+                      <div className="bg-[#0d1120] border border-[#1a1f32] rounded-lg overflow-hidden mb-3">
+                        {approveResults.map((r) => (
+                          <button
+                            key={r.name}
+                            onClick={() => handleApprove(req, r.name)}
+                            disabled={isActionLoading}
+                            className="block w-full text-left px-3 py-2.5 text-xs text-neutral-300 hover:bg-[#1a1f32] hover:text-[#c9a84c] transition border-b border-[#1a1f32] last:border-0"
+                          >
+                            <span className="font-mono text-[#c9a84c] mr-2">{r.name}</span>
+                            {r.item_name}
+                            {r.standard_rate > 0 && (
+                              <span className="ml-2 text-neutral-500">{fmt$$(r.standard_rate)}</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApprove(req)}
+                        disabled={isActionLoading}
+                        className="px-4 py-2 bg-[#28a745] hover:bg-[#1e7e34] text-white rounded-lg text-xs font-bold transition disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {isActionLoading ? <Spinner size="sm" /> : null}
+                        Approve as New Part
+                      </button>
+                      <button
+                        onClick={() => setApprovingRow(null)}
+                        className="px-4 py-2 bg-[#1a1f32] text-neutral-400 hover:text-white rounded-lg text-xs font-semibold transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reject panel */}
+                {isRejecting && (
+                  <div className="px-4 pb-4 bg-[#111627] border-t border-[#1a1f32]">
+                    <p className="text-xs text-neutral-400 mt-3 mb-2">Rejection reason (optional):</p>
+                    <input
+                      type="text"
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleReject(req); }}
+                      className="w-full bg-[#0d1120] border border-[#1a1f32] rounded-lg px-3 py-2 text-sm text-[#f0ebe0] placeholder-neutral-600 focus:outline-none focus:border-[#dc3545]/60 transition mb-3"
+                      placeholder="e.g. Duplicate of existing item"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleReject(req)}
+                        disabled={isRejectLoading}
+                        className="px-4 py-2 bg-[#dc3545] hover:bg-[#c82333] text-white rounded-lg text-xs font-bold transition disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {isRejectLoading ? <Spinner size="sm" /> : null}
+                        Confirm Reject
+                      </button>
+                      <button
+                        onClick={() => setRejectingRow(null)}
+                        className="px-4 py-2 bg-[#1a1f32] text-neutral-400 hover:text-white rounded-lg text-xs font-semibold transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
 // MATCHES TAB
 // ──────────────────────────────────────────────
 
@@ -1886,6 +2299,12 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [allChecked, setAllChecked] = useState(false);
   const [bulkApproving, setBulkApproving] = useState(false);
+
+  // New Part modal
+  const [newPartItem, setNewPartItem] = useState<UnmatchedItem | null>(null);
+
+  // Keyboard navigation
+  const [focusedIdx, setFocusedIdx] = useState<number>(-1);
 
   const [toast, setToast] = useState("");
 
@@ -1921,6 +2340,47 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
   useEffect(() => {
     load(1, true);
   }, [load]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInputFocused =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable;
+      if (isInputFocused) return;
+
+      const visible = items.filter((i) => !resolvedRows.has(i.name));
+      if (visible.length === 0) return;
+
+      if (e.key === "j" || e.key === "J") {
+        e.preventDefault();
+        setFocusedIdx((prev) => Math.min(prev + 1, visible.length - 1));
+      } else if (e.key === "k" || e.key === "K") {
+        e.preventDefault();
+        setFocusedIdx((prev) => Math.max(prev - 1, 0));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (focusedIdx >= 0 && focusedIdx < visible.length) {
+          const item = visible[focusedIdx];
+          if (item.matched_item) handleApprove(item);
+        }
+      } else if (e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        setFocusedIdx((prev) => Math.min(prev + 1, visible.length - 1));
+      } else if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        if (focusedIdx >= 0 && focusedIdx < visible.length) {
+          handleNotItem(visible[focusedIdx]);
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, resolvedRows, focusedIdx]);
 
   const removeRow = (name: string) => {
     setResolvedRows((prev) => new Set([...prev, name]));
@@ -1959,7 +2419,6 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
     setFixingRow(null);
     try {
       await correctMatch(item.name, result.name, true);
-      // Update the row in-place to show 100% match, then remove after brief delay
       setItems((prev) =>
         prev.map((i) =>
           i.name === item.name
@@ -1968,7 +2427,6 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
         )
       );
       showToast(`Matched to "${result.item_name}" — saved for future auto-matching.`);
-      // Fade and remove after 1.5s so user can see the update
       setTimeout(() => removeRow(item.name), 1500);
     } catch (e: unknown) {
       showToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
@@ -2044,6 +2502,7 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
         </div>
         <p className="text-white font-semibold mb-1">All caught up</p>
         <p className="text-neutral-400 text-sm">No items need review.</p>
+        <PendingPartsSection showToast={showToast} />
       </div>
     );
   }
@@ -2057,8 +2516,24 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
         </div>
       )}
 
+      {/* New Part Modal */}
+      {newPartItem && (
+        <NewPartModal
+          prefillDescription={newPartItem.description}
+          prefillSupplierCode={newPartItem.product_code}
+          prefillSupplier={newPartItem.supplier}
+          receiptItem={newPartItem.name}
+          onSuccess={() => {
+            removeRow(newPartItem.name);
+            setNewPartItem(null);
+          }}
+          onClose={() => setNewPartItem(null)}
+          showToast={showToast}
+        />
+      )}
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h2 className="text-white font-serif font-bold text-xl">Match Review</h2>
           <p className="text-xs text-neutral-500 mt-0.5">
@@ -2080,10 +2555,19 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
         </div>
       </div>
 
+      {/* Keyboard nav hint */}
+      <p className="text-[11px] text-neutral-600 mb-4 hidden md:block">
+        Keyboard: <kbd className="bg-[#1a1f32] text-neutral-400 px-1.5 py-0.5 rounded text-[10px] font-mono">J</kbd> next &nbsp;
+        <kbd className="bg-[#1a1f32] text-neutral-400 px-1.5 py-0.5 rounded text-[10px] font-mono">K</kbd> prev &nbsp;
+        <kbd className="bg-[#1a1f32] text-neutral-400 px-1.5 py-0.5 rounded text-[10px] font-mono">Enter</kbd> approve &nbsp;
+        <kbd className="bg-[#1a1f32] text-neutral-400 px-1.5 py-0.5 rounded text-[10px] font-mono">S</kbd> skip &nbsp;
+        <kbd className="bg-[#1a1f32] text-neutral-400 px-1.5 py-0.5 rounded text-[10px] font-mono">N</kbd> not item
+      </p>
+
       {/* Table */}
       <div className="bg-[#0d1120] border border-[#1a1f32] rounded-2xl overflow-hidden">
         {/* Table header — hidden on mobile, shown on md+ */}
-        <div className="hidden md:grid grid-cols-[40px_1fr_120px_80px_180px_160px] gap-0 border-b border-[#1a1f32]">
+        <div className="hidden md:grid grid-cols-[40px_1fr_120px_80px_180px_200px] gap-0 border-b border-[#1a1f32]">
           <div className="px-4 py-3 flex items-center">
             <input
               type="checkbox"
@@ -2101,21 +2585,76 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
 
         {/* Rows */}
         {visibleItems.map((item, idx) => {
+          const tier = getConfidenceTier(item.match_count ?? 0);
+          const isLockedIn = tier === "locked_in";
+          const isFirstMatch = tier === "first_match";
           const isFixing = fixingRow === item.name;
           const isLoading = !!actionLoading[item.name];
           const isNotItemLoading = !!actionLoading[`ni_${item.name}`];
           const hasMatch = !!item.matched_item;
           const isCorrected = item.mapping_status === "Corrected";
+          const isFocused = focusedIdx === idx;
+
+          // Locked-in rows render as collapsed single-line summary
+          if (isLockedIn && !isFixing) {
+            return (
+              <div
+                key={item.name}
+                onClick={() => setFixingRow(item.name)}
+                className={`border-b border-[#0D47A1] last:border-0 cursor-pointer transition ${
+                  isFocused ? "ring-2 ring-inset ring-[#c9a84c]" : ""
+                }`}
+                style={{ backgroundColor: "#1565C0" }}
+              >
+                <div className="px-4 py-3 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={!!checked[item.name]}
+                      onChange={(e) => { e.stopPropagation(); setChecked((c) => ({ ...c, [item.name]: e.target.checked })); }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 rounded accent-[#c9a84c] flex-shrink-0"
+                    />
+                    <p className="text-sm text-white font-semibold leading-snug truncate">
+                      {item.description}
+                    </p>
+                    <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-bold flex-shrink-0">
+                      LOCKED IN
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 flex-shrink-0 text-white/80 text-xs">
+                    <span>Qty: {item.quantity}</span>
+                    {item.unit_price > 0 && <span>{fmt$$(item.unit_price)}</span>}
+                    <svg className="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // Row background based on tier
+          const rowBg = isLockedIn
+            ? "bg-[#1565C0]"
+            : isFirstMatch
+            ? "bg-[#E3F2FD]"
+            : isCorrected
+            ? "bg-[#28a745]/5"
+            : "";
+
+          const rowText = isFirstMatch ? "text-[#1565C0]" : "";
+          const borderColor = isFirstMatch ? "border-[#90CAF9]" : "border-[#1a1f32]";
 
           return (
             <div
               key={item.name}
-              className={`border-b border-[#1a1f32] last:border-0 transition ${
-                isCorrected ? "opacity-60 bg-[#28a745]/5" : "hover:bg-[#111627]"
-              }`}
+              className={`border-b last:border-0 transition ${borderColor} ${rowBg} ${
+                isFocused ? "ring-2 ring-inset ring-[#c9a84c]" : ""
+              } ${isCorrected ? "opacity-60" : isFirstMatch ? "" : "hover:bg-[#111627]"}`}
             >
               {/* Main row — desktop grid */}
-              <div className="hidden md:grid grid-cols-[40px_1fr_120px_80px_180px_160px] gap-0 px-0 py-3 items-start">
+              <div className="hidden md:grid grid-cols-[40px_1fr_120px_80px_180px_200px] gap-0 px-0 py-3 items-start">
                 {/* Checkbox */}
                 <div className="px-4 pt-0.5">
                   <input
@@ -2129,21 +2668,21 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
                 {/* OCR Text */}
                 <div className="px-3 min-w-0">
                   {item.product_code && (
-                    <p className="text-[11px] text-[#c9a84c] font-mono font-bold mb-0.5">
+                    <p className={`text-[11px] font-mono font-bold mb-0.5 ${isFirstMatch ? "text-[#1565C0]" : "text-[#c9a84c]"}`}>
                       {item.product_code}
                     </p>
                   )}
-                  <p className="text-sm text-[#f0ebe0] leading-snug break-words">
+                  <p className={`text-sm leading-snug break-words ${isFirstMatch ? "text-[#1565C0]" : "text-[#f0ebe0]"}`}>
                     {item.description}
                   </p>
-                  <p className="text-[10px] text-neutral-600 mt-1">
+                  <p className={`text-[10px] mt-1 ${isFirstMatch ? "text-[#1565C0]/60" : "text-neutral-600"}`}>
                     {fmtDate(item.receipt_date)} &middot; {item.receipt_name}
                   </p>
                 </div>
 
                 {/* Supplier */}
                 <div className="px-3">
-                  <span className="text-xs text-neutral-300">{item.supplier || "—"}</span>
+                  <span className={`text-xs ${isFirstMatch ? rowText : "text-neutral-300"}`}>{item.supplier || "—"}</span>
                 </div>
 
                 {/* Score */}
@@ -2153,18 +2692,18 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
                       {Math.round(item.match_score)}%
                     </span>
                   ) : (
-                    <span className="text-xs text-neutral-600">—</span>
+                    <span className={`text-xs ${isFirstMatch ? "text-[#1565C0]/50" : "text-neutral-600"}`}>—</span>
                   )}
                 </div>
 
                 {/* Current Match */}
                 <div className="px-3">
                   {hasMatch ? (
-                    <p className="text-xs text-[#f0ebe0] leading-snug font-mono break-all">
+                    <p className={`text-xs leading-snug font-mono break-all ${isFirstMatch ? "text-[#1565C0]" : "text-[#f0ebe0]"}`}>
                       {item.matched_item}
                     </p>
                   ) : (
-                    <span className="text-xs text-neutral-600 italic">None</span>
+                    <span className={`text-xs italic ${isFirstMatch ? "text-[#1565C0]/50" : "text-neutral-600"}`}>None</span>
                   )}
                   {isCorrected && (
                     <span className="text-[10px] text-[#28a745] font-semibold block mt-0.5">Corrected</span>
@@ -2180,6 +2719,8 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
                     className={`min-h-[30px] px-2.5 py-1 rounded-lg text-[11px] font-bold transition disabled:opacity-40 ${
                       isFixing
                         ? "bg-[#c9a84c] text-[#080c18]"
+                        : isFirstMatch
+                        ? "bg-[#1565C0]/10 border border-[#1565C0]/40 text-[#1565C0] hover:bg-[#1565C0]/20"
                         : "bg-[#1a1f32] text-neutral-300 hover:text-[#c9a84c] hover:border-[#c9a84c]/40 border border-[#1a1f32]"
                     }`}
                   >
@@ -2191,7 +2732,11 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
                     onClick={() => handleApprove(item)}
                     disabled={isLoading || isNotItemLoading || !hasMatch}
                     title={!hasMatch ? "No match to approve" : "Approve this match"}
-                    className="min-h-[30px] px-2.5 py-1 bg-[#1a1f32] border border-[#1a1f32] text-neutral-300 hover:text-[#28a745] hover:border-[#28a745]/40 rounded-lg text-[11px] font-bold transition disabled:opacity-40 flex items-center gap-1"
+                    className={`min-h-[30px] px-2.5 py-1 border rounded-lg text-[11px] font-bold transition disabled:opacity-40 flex items-center gap-1 ${
+                      isFirstMatch
+                        ? "bg-[#1565C0]/10 border-[#1565C0]/40 text-[#1565C0] hover:bg-[#28a745]/10 hover:border-[#28a745]/40 hover:text-[#28a745]"
+                        : "bg-[#1a1f32] border-[#1a1f32] text-neutral-300 hover:text-[#28a745] hover:border-[#28a745]/40"
+                    }`}
                   >
                     {isLoading ? <Spinner size="sm" /> : (
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -2205,7 +2750,11 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
                     onClick={() => handleNotItem(item)}
                     disabled={isLoading || isNotItemLoading}
                     title="Mark as junk / not a real item"
-                    className="min-h-[30px] px-2.5 py-1 bg-[#1a1f32] border border-[#1a1f32] text-neutral-300 hover:text-[#dc3545] hover:border-[#dc3545]/40 rounded-lg text-[11px] font-bold transition disabled:opacity-40 flex items-center gap-1"
+                    className={`min-h-[30px] px-2.5 py-1 border rounded-lg text-[11px] font-bold transition disabled:opacity-40 flex items-center gap-1 ${
+                      isFirstMatch
+                        ? "bg-[#1565C0]/10 border-[#1565C0]/40 text-[#1565C0] hover:bg-[#dc3545]/10 hover:border-[#dc3545]/40 hover:text-[#dc3545]"
+                        : "bg-[#1a1f32] border-[#1a1f32] text-neutral-300 hover:text-[#dc3545] hover:border-[#dc3545]/40"
+                    }`}
                   >
                     {isNotItemLoading ? <Spinner size="sm" /> : (
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -2213,6 +2762,18 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
                       </svg>
                     )}
                   </button>
+
+                  {/* NEW PART — only for unmatched items */}
+                  {!hasMatch && (
+                    <button
+                      onClick={() => setNewPartItem(item)}
+                      disabled={isLoading || isNotItemLoading}
+                      title="Submit as a new part request"
+                      className="min-h-[30px] px-2.5 py-1 rounded-lg text-[11px] font-semibold transition disabled:opacity-40 bg-[#E67E22] text-white hover:bg-[#D35400]"
+                    >
+                      + New Part
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2227,12 +2788,12 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
                   />
                   <div className="flex-1 min-w-0">
                     {item.product_code && (
-                      <p className="text-[11px] text-[#c9a84c] font-mono font-bold mb-0.5">
+                      <p className={`text-[11px] font-mono font-bold mb-0.5 ${isFirstMatch ? "text-[#1565C0]" : "text-[#c9a84c]"}`}>
                         {item.product_code}
                       </p>
                     )}
-                    <p className="text-sm text-[#f0ebe0] leading-snug">{item.description}</p>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] text-neutral-500">
+                    <p className={`text-sm leading-snug ${isFirstMatch ? "text-[#1565C0]" : "text-[#f0ebe0]"}`}>{item.description}</p>
+                    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] ${isFirstMatch ? "text-[#1565C0]/70" : "text-neutral-500"}`}>
                       <span>{item.supplier || "—"}</span>
                       {item.match_score > 0 && (
                         <span className={`font-bold ${scoreColor(item.match_score)}`}>
@@ -2242,18 +2803,18 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
                       <span>{fmtDate(item.receipt_date)}</span>
                     </div>
                     {hasMatch && (
-                      <p className="text-[11px] text-neutral-400 mt-1.5 font-mono break-all">
+                      <p className={`text-[11px] mt-1.5 font-mono break-all ${isFirstMatch ? "text-[#1565C0]/80" : "text-neutral-400"}`}>
                         Match: {item.matched_item}
                       </p>
                     )}
                     {!hasMatch && (
-                      <p className="text-[11px] text-neutral-600 mt-1.5 italic">No match found</p>
+                      <p className={`text-[11px] mt-1.5 italic ${isFirstMatch ? "text-[#1565C0]/50" : "text-neutral-600"}`}>No match found</p>
                     )}
                   </div>
                 </div>
 
                 {/* Mobile action row */}
-                <div className="flex items-center gap-2 pl-7">
+                <div className="flex items-center gap-2 pl-7 flex-wrap">
                   <button
                     onClick={() => setFixingRow(isFixing ? null : item.name)}
                     disabled={isLoading || isNotItemLoading}
@@ -2279,6 +2840,15 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
                   >
                     {isNotItemLoading ? <Spinner size="sm" /> : "NOT ITEM"}
                   </button>
+                  {!hasMatch && (
+                    <button
+                      onClick={() => setNewPartItem(item)}
+                      disabled={isLoading || isNotItemLoading}
+                      className="min-h-[34px] px-3 bg-[#E67E22] hover:bg-[#D35400] text-white rounded-lg text-xs font-semibold transition disabled:opacity-40"
+                    >
+                      + New Part
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2308,6 +2878,9 @@ function MatchesTab({ onCountChange }: { onCountChange?: (n: number) => void }) 
           </button>
         </div>
       )}
+
+      {/* Pending Parts Section */}
+      <PendingPartsSection showToast={showToast} />
     </div>
   );
 }
