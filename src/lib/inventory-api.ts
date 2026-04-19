@@ -357,6 +357,7 @@ export interface UnmatchedItem {
   mapping_status: MappingStatus;
   supplier: string;
   receipt_date: string;
+  match_count: number;
 }
 
 export interface UnmatchedItemsResponse {
@@ -443,5 +444,64 @@ export async function markNotItem(
 ): Promise<MarkNotItemResult> {
   return callMethod<MarkNotItemResult>(`${MATCH_API}.mark_not_item`, {
     parsed_item_name: parsedItemName,
+  });
+}
+
+// ── Confidence ──
+
+export type ConfidenceTier = "unmatched" | "first_match" | "locked_in";
+
+export const CONFIDENCE_COLORS: Record<ConfidenceTier, { bg: string; text: string; border: string }> = {
+  unmatched:   { bg: "#FFFFFF", text: "#333333", border: "#dddddd" },
+  first_match: { bg: "#E3F2FD", text: "#1565C0", border: "#90CAF9" },
+  locked_in:   { bg: "#1565C0", text: "#FFFFFF", border: "#0D47A1" },
+};
+
+export function getConfidenceTier(matchCount: number): ConfidenceTier {
+  if (matchCount >= 5) return "locked_in";
+  if (matchCount >= 1) return "first_match";
+  return "unmatched";
+}
+
+// ── Pricebook Requests ──
+
+export interface PricebookRequest {
+  name: string;
+  part_name: string;
+  trade: string;
+  size: string;
+  supplier_code: string;
+  supplier: string;
+  submitted_by: string;
+  creation: string;
+  status: string;
+}
+
+export async function submitNewPart(params: {
+  part_name: string; trade: string; size?: string;
+  supplier_code?: string; supplier?: string; receipt_item?: string;
+}): Promise<{ name: string; status: string }> {
+  return callMethod(`${MATCH_API}.submit_new_part`, params);
+}
+
+export async function fetchPendingParts(page?: number, pageSize?: number): Promise<{
+  items: PricebookRequest[]; total_count: number; has_more: boolean;
+}> {
+  return callMethod(`${MATCH_API}.get_pending_parts`, {
+    page: page || 1, page_size: pageSize || 50,
+  });
+}
+
+export async function approveNewPart(requestName: string, itemCode?: string): Promise<{
+  status: string; item_code: string;
+}> {
+  return callMethod(`${MATCH_API}.approve_new_part`, {
+    request_name: requestName, ...(itemCode ? { item_code: itemCode } : {}),
+  });
+}
+
+export async function rejectNewPart(requestName: string, reason?: string): Promise<{ status: string }> {
+  return callMethod(`${MATCH_API}.reject_new_part`, {
+    request_name: requestName, rejection_reason: reason || "",
   });
 }
