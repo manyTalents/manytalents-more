@@ -336,3 +336,112 @@ export async function addToPullList(
 export async function fetchPullSummary(): Promise<PullSummary> {
   return callMethod<PullSummary>(`${RESTOCK_API}.get_pull_summary`);
 }
+
+// ──────────────────────────────────────────────
+// Match Review
+// ──────────────────────────────────────────────
+
+const MATCH_API = "hcp_replacement.hcp_replacement.api.match_review";
+
+export type MappingStatus = "Pending" | "Approved" | "Corrected" | "Not Item";
+
+export interface UnmatchedItem {
+  name: string;
+  receipt_name: string;
+  product_code: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  matched_item: string;
+  match_score: number;
+  mapping_status: MappingStatus;
+  supplier: string;
+  receipt_date: string;
+}
+
+export interface UnmatchedItemsResponse {
+  items: UnmatchedItem[];
+  total_count: number;
+  has_more: boolean;
+}
+
+export interface PricebookResult {
+  name: string;
+  item_name: string;
+  item_group: string;
+  standard_rate: number;
+}
+
+export interface CorrectMatchResult {
+  status: string;
+  item_code: string;
+  item_name: string;
+}
+
+export interface ApproveMatchResult {
+  status: string;
+}
+
+export interface BulkApproveResult {
+  approved: number;
+}
+
+export interface MarkNotItemResult {
+  status: string;
+}
+
+export async function fetchUnmatchedItems(
+  page: number = 1,
+  pageSize: number = 50
+): Promise<UnmatchedItemsResponse> {
+  return callMethod<UnmatchedItemsResponse>(`${MATCH_API}.get_unmatched_items`, {
+    page,
+    page_size: pageSize,
+  });
+}
+
+export async function searchPricebook(
+  query: string,
+  limit: number = 10
+): Promise<PricebookResult[]> {
+  return callMethod<PricebookResult[]>(`${MATCH_API}.search_pricebook`, {
+    query,
+    limit,
+  });
+}
+
+export async function correctMatch(
+  parsedItemName: string,
+  itemCode: string,
+  learn: boolean = true
+): Promise<CorrectMatchResult> {
+  return callMethod<CorrectMatchResult>(`${MATCH_API}.correct_match`, {
+    parsed_item_name: parsedItemName,
+    item_code: itemCode,
+    learn: learn ? 1 : 0,
+  });
+}
+
+export async function approveMatch(
+  parsedItemName: string
+): Promise<ApproveMatchResult> {
+  return callMethod<ApproveMatchResult>(`${MATCH_API}.approve_match`, {
+    parsed_item_name: parsedItemName,
+  });
+}
+
+export async function bulkApprove(
+  itemNames: string[]
+): Promise<BulkApproveResult> {
+  return callMethod<BulkApproveResult>(`${MATCH_API}.bulk_approve`, {
+    items_json: JSON.stringify(itemNames),
+  });
+}
+
+export async function markNotItem(
+  parsedItemName: string
+): Promise<MarkNotItemResult> {
+  return callMethod<MarkNotItemResult>(`${MATCH_API}.mark_not_item`, {
+    parsed_item_name: parsedItemName,
+  });
+}
