@@ -584,6 +584,25 @@ function ReceiptsTab() {
   const [error, setError] = useState("");
   const [dispatchingReceipt, setDispatchingReceipt] = useState<string | null>(null);
 
+  // Browser back button support — push history state when entering sub-views
+  const openDispatch = useCallback((name: string) => {
+    setDispatchingReceipt(name);
+    window.history.pushState({ view: "dispatch", receipt: name }, "");
+  }, []);
+
+  const closeDispatch = useCallback(() => {
+    setDispatchingReceipt(null);
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      // Browser back pressed — close any open sub-view
+      setDispatchingReceipt(null);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   const load = useCallback(async (pg: number, filter: StatusFilter, replace: boolean) => {
     if (pg === 1) setLoading(true); else setLoadingMore(true);
     try {
@@ -608,7 +627,7 @@ function ReceiptsTab() {
     return (
       <DispatchView
         receiptName={dispatchingReceipt}
-        onBack={() => setDispatchingReceipt(null)}
+        onBack={closeDispatch}
       />
     );
   }
@@ -699,7 +718,7 @@ function ReceiptsTab() {
 
               {/* Dispatch button */}
               <button
-                onClick={() => setDispatchingReceipt(r.name)}
+                onClick={() => openDispatch(r.name)}
                 className="flex-shrink-0 min-h-[36px] px-4 py-2 bg-gradient-to-br from-[#c9a84c] to-[#a8893d] text-[#080c18] font-bold rounded-lg text-xs hover:from-[#e0c068] hover:to-[#c9a84c] transition"
               >
                 DISPATCH
@@ -1758,15 +1777,27 @@ export default function InventoryPage() {
       <nav className="bg-[#0d1120] border-b border-[#1a1f32] sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Link
-              href="/manager/dashboard"
-              className="text-sm text-neutral-400 hover:text-[#c9a84c] transition flex items-center gap-1.5"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Dashboard
-            </Link>
+            {dispatchingReceipt ? (
+              <button
+                onClick={closeDispatch}
+                className="text-sm text-neutral-400 hover:text-[#c9a84c] transition flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Receipts
+              </button>
+            ) : (
+              <Link
+                href="/manager/dashboard"
+                className="text-sm text-neutral-400 hover:text-[#c9a84c] transition flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Dashboard
+              </Link>
+            )}
             <div className="h-4 w-px bg-[#1a1f32]" />
             <h1 className="text-sm font-bold tracking-widest text-white uppercase">Inventory</h1>
           </div>
