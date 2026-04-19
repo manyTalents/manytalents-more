@@ -1,0 +1,1269 @@
+"use client";
+
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { getAuth } from "@/lib/frappe";
+import {
+  fetchAllReceipts,
+  fetchReceiptDetail,
+  fetchWarehouseList,
+  fetchWarehouseStock,
+  fetchLimboItems,
+  dispatchItems,
+  dispatchAllToJob,
+  type ReceiptRow,
+  type ReceiptDetail,
+  type ReceiptItem,
+  type ReceiptsResponse,
+  type WarehouseCard,
+  type WarehouseListResponse,
+  type WarehouseStockResponse,
+  type StockItem,
+  type LimboGroup,
+  type ItemDestination,
+  type DispatchItemInput,
+} from "@/lib/inventory-api";
+
+// ──────────────────────────────────────────────
+// Constants
+// ──────────────────────────────────────────────
+
+type MainTab = "receipts" | "warehouses" | "limbo";
+type StatusFilter = "" | "Pending" | "Complete" | "Failed";
+type ViewMode = "table" | "cards";
+
+const STATUS_DOT: Record<string, string> = {
+  Complete: "bg-[#28a745]",
+  Pending: "bg-[#E67E22]",
+  Failed: "bg-[#dc3545]",
+};
+
+const STATUS_TEXT: Record<string, string> = {
+  Complete: "text-[#28a745]",
+  Pending: "text-[#E67E22]",
+  Failed: "text-[#dc3545]",
+};
+
+const DESTINATIONS: ItemDestination[] = [
+  "This Job",
+  "Truck",
+  "Office",
+  "Limbo",
+  "Diff Job",
+  "Returned",
+  "Lost",
+];
+
+const PAGE_SIZE = 25;
+
+// ──────────────────────────────────────────────
+// Utility helpers
+// ──────────────────────────────────────────────
+
+function fmt$$(n: number): string {
+  return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+function fmtDate(s: string): string {
+  if (!s) return "—";
+  const d = new Date(s);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase())
+    .join("")
+    .slice(0, 2);
+}
+
+function matchColor(score: number): string {
+  if (score >= 90) return "text-[#28a745]";
+  if (score >= 70) return "text-[#E67E22]";
+  return "text-[#dc3545]";
+}
+
+// ──────────────────────────────────────────────
+// Destination button row (shared by table + card + limbo)
+// ──────────────────────────────────────────────
+
+interface DestButtonsProps {
+  current: ItemDestination;
+  hasJob: boolean;
+  onSelect: (d: ItemDestination) => void;
+  disabled?: boolean;
+}
+
+function DestButtons({ current, hasJob, onSelect, disabled }: DestButtonsProps) {
+  const [truckOpen, setTruckOpen] = useState(false);
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {DESTINATIONS.map((d) => {
+        if (d === "This Job" && !hasJob) return null;
+        const active = current === d;
+
+        if (d === "Truck") {
+          return (
+            <div key={d} className="relative">
+              <button
+                disabled={disabled}
+                onClick={() => setTruckOpen((v) => !v)}
+                className={`min-h-[32px] px-2 py-1 rounded text-[11px] font-semibold transition whitespace-nowrap
+                  ${active
+                    ? "bg-[#c9a84c] text-[#080c18]"
+                    : "bg-[#1a1f32] text-neutral-400 hover:text-white hover:bg-[#1e2540]"
+                  } disabled:opacity-40`}
+              >
+                Truck {truckOpen ? "▲" : "▾"}
+              </button>
+              {truckOpen && (
+                <div className="absolute top-full left-0 mt-1 z-20 bg-[#0d1120] border border-[#1a1f32] rounded-lg shadow-xl min-w-[140px]">
+                  {["My Truck", "Other Truck"].map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => { onSelect("Truck"); setTruckOpen(false); }}
+                      className="block w-full text-left px-3 py-2 text-xs text-neutral-300 hover:bg-[#111627] hover:text-[#c9a84c] transition"
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        return (
+          <button
+            key={d}
+            disabled={disabled}
+            onClick={() => onSelect(d)}
+            className={`min-h-[32px] px-2 py-1 rounded text-[11px] font-semibold transition whitespace-nowrap
+              ${active
+                ? d === "Limbo"
+                  ? "bg-[#E67E22]/20 text-[#E67E22] border border-[#E67E22]/50"
+                  : "bg-[#c9a84c] text-[#080c18]"
+                : "bg-[#1a1f32] text-neutral-400 hover:text-white hover:bg-[#1e2540]"
+              } disabled:opacity-40`}
+          >
+            {d}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
+// Spinner
+// ──────────────────────────────────────────────
+
+function Spinner({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
+  const s = size === "sm" ? "h-4 w-4" : size === "lg" ? "h-10 w-10" : "h-6 w-6";
+  return (
+    <div className={`${s} rounded-full border-2 border-[#c9a84c] border-t-transparent animate-spin`} />
+  );
+}
+
+// ──────────────────────────────────────────────
+// SendButton (per-row dispatch)
+// ──────────────────────────────────────────────
+
+function SendButton({ onClick, loading, done }: { onClick: () => void; loading: boolean; done: boolean }) {
+  if (done) {
+    return (
+      <span className="min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold text-[#28a745] bg-[#28a745]/10 border border-[#28a745]/30 flex items-center gap-1">
+        Sent
+      </span>
+    );
+  }
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className="min-h-[36px] px-3 py-1.5 bg-gradient-to-br from-[#28a745] to-[#1e7e34] text-white rounded-lg text-xs font-bold hover:from-[#34ce57] hover:to-[#28a745] transition disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+    >
+      {loading ? <Spinner size="sm" /> : "SEND"}
+    </button>
+  );
+}
+
+// ──────────────────────────────────────────────
+// DISPATCH VIEW
+// ──────────────────────────────────────────────
+
+interface DispatchViewProps {
+  receiptName: string;
+  onBack: () => void;
+}
+
+function DispatchView({ receiptName, onBack }: DispatchViewProps) {
+  const [detail, setDetail] = useState<ReceiptDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [dests, setDests] = useState<Record<string, ItemDestination>>({});
+  const [sending, setSending] = useState<Record<string, boolean>>({});
+  const [sent, setSent] = useState<Record<string, boolean>>({});
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [allChecked, setAllChecked] = useState(false);
+  const [dispatchingAll, setDispatchingAll] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [toast, setToast] = useState("");
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3000);
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    fetchReceiptDetail(receiptName)
+      .then((d) => {
+        setDetail(d);
+        // Initialize destinations — default to current or "Limbo"
+        const init: Record<string, ItemDestination> = {};
+        const checks: Record<string, boolean> = {};
+        for (const item of d.items) {
+          init[item.name] = item.destination || "Limbo";
+          checks[item.name] = false;
+        }
+        setDests(init);
+        setChecked(checks);
+        // Mark already dispatched items
+        const sentInit: Record<string, boolean> = {};
+        for (const item of d.items) {
+          if (item.dispatched) sentInit[item.name] = true;
+        }
+        setSent(sentInit);
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [receiptName]);
+
+  const handleSendOne = async (item: ReceiptItem) => {
+    if (!detail) return;
+    setSending((s) => ({ ...s, [item.name]: true }));
+    try {
+      const payload: DispatchItemInput[] = [{
+        item_name: item.name,
+        destination: dests[item.name] || "Limbo",
+      }];
+      await dispatchItems(detail.hcp_job || "", payload);
+      setSent((s) => ({ ...s, [item.name]: true }));
+      showToast("Item dispatched.");
+    } catch (e: unknown) {
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setSending((s) => ({ ...s, [item.name]: false }));
+    }
+  };
+
+  const handleDispatchAll = async () => {
+    if (!detail?.hcp_job) return;
+    setDispatchingAll(true);
+    try {
+      const res = await dispatchAllToJob(detail.hcp_job);
+      const newSent: Record<string, boolean> = { ...sent };
+      for (const item of detail.items) newSent[item.name] = true;
+      setSent(newSent);
+      showToast(`Dispatched ${res.dispatched} item(s) to job.`);
+    } catch (e: unknown) {
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setDispatchingAll(false);
+    }
+  };
+
+  const handleSync = async () => {
+    if (!detail) return;
+    setSyncing(true);
+    try {
+      const checkedItems = detail.items.filter(
+        (it) => checked[it.name] && (dests[it.name] || "Limbo") !== "Limbo" && !sent[it.name]
+      );
+      const payload: DispatchItemInput[] = checkedItems.map((it) => ({
+        item_name: it.name,
+        destination: dests[it.name],
+      }));
+      if (payload.length === 0) {
+        showToast("No non-Limbo checked items to sync.");
+        setSyncing(false);
+        return;
+      }
+      const res = await dispatchItems(detail.hcp_job || "", payload);
+      const newSent: Record<string, boolean> = { ...sent };
+      for (const it of checkedItems) newSent[it.name] = true;
+      setSent(newSent);
+      showToast(`Synced ${res.dispatched} item(s).`);
+    } catch (e: unknown) {
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const toggleAll = () => {
+    const next = !allChecked;
+    setAllChecked(next);
+    if (!detail) return;
+    const newChecked: Record<string, boolean> = {};
+    for (const item of detail.items) newChecked[item.name] = next;
+    setChecked(newChecked);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error || !detail) {
+    return (
+      <div className="p-6 text-[#dc3545] text-sm">
+        {error || "Failed to load receipt."}
+        <button onClick={onBack} className="ml-4 text-[#c9a84c] underline text-sm">Back</button>
+      </div>
+    );
+  }
+
+  const hasJob = !!detail.hcp_job;
+
+  return (
+    <div>
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#0d1120] border border-[#c9a84c]/50 text-[#c9a84c] text-sm px-5 py-3 rounded-xl shadow-2xl">
+          {toast}
+        </div>
+      )}
+
+      {/* Back + header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="text-neutral-400 hover:text-[#c9a84c] transition flex items-center gap-1.5 text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Receipts
+          </button>
+          <div className="h-4 w-px bg-[#1a1f32]" />
+          <div>
+            <p className="text-xs text-neutral-500 uppercase tracking-wider">{receiptName}</p>
+            <h2 className="text-lg font-serif font-bold text-white">{detail.supplier}</h2>
+          </div>
+        </div>
+
+        {/* Meta */}
+        <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-400">
+          <span className="font-bold text-[#c9a84c]">{fmt$$(detail.parsed_total)}</span>
+          {detail.buyer_name && (
+            <span className="flex items-center gap-1.5">
+              <span className="h-6 w-6 rounded-full bg-[#1a1f32] text-[10px] font-bold text-[#c9a84c] flex items-center justify-center">
+                {initials(detail.buyer_name)}
+              </span>
+              {detail.buyer_name}
+            </span>
+          )}
+          <span>{fmtDate(detail.receipt_date)}</span>
+          {detail.hcp_job_id && (
+            <span className="text-[#c9a84c] font-mono text-xs">#{detail.hcp_job_id}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Action bar */}
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        {hasJob && (
+          <button
+            onClick={handleDispatchAll}
+            disabled={dispatchingAll}
+            className="flex items-center gap-2 bg-gradient-to-br from-[#28a745] to-[#1e7e34] text-white font-bold px-4 py-2.5 rounded-xl text-sm hover:from-[#34ce57] hover:to-[#28a745] transition disabled:opacity-50"
+          >
+            {dispatchingAll ? <Spinner size="sm" /> : null}
+            DISPATCH ALL TO THIS JOB
+          </button>
+        )}
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          className="flex items-center gap-2 bg-[#1a1f32] text-neutral-300 font-semibold px-4 py-2.5 rounded-xl text-sm hover:text-white hover:bg-[#1e2540] transition disabled:opacity-50 border border-[#1a1f32]"
+        >
+          {syncing ? <Spinner size="sm" /> : null}
+          SYNC CHECKED
+        </button>
+
+        {/* View toggle */}
+        <div className="ml-auto flex items-center gap-1 bg-[#0d1120] border border-[#1a1f32] rounded-xl p-1">
+          {(["table", "cards"] as ViewMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => setViewMode(m)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition capitalize ${
+                viewMode === m
+                  ? "bg-[#c9a84c] text-[#080c18]"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              {m === "table" ? "Table" : "Cards"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Summary chips */}
+      <div className="flex flex-wrap gap-3 mb-5 text-xs">
+        {[
+          { label: "Total", val: detail.dispatch_summary?.total ?? detail.items.length },
+          { label: "Dispatched", val: detail.dispatch_summary?.dispatched ?? 0, color: "text-[#28a745]" },
+          { label: "Pending", val: detail.dispatch_summary?.pending ?? 0, color: "text-[#E67E22]" },
+          { label: "Limbo", val: detail.dispatch_summary?.limbo ?? 0, color: "text-[#E67E22]" },
+        ].map((chip) => (
+          <div key={chip.label} className="bg-[#0d1120] border border-[#1a1f32] rounded-lg px-3 py-1.5">
+            <span className="text-neutral-500">{chip.label}: </span>
+            <span className={`font-bold ${chip.color || "text-white"}`}>{chip.val}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Table view */}
+      {viewMode === "table" && (
+        <div className="bg-[#0d1120] border border-[#1a1f32] rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#1a1f32]">
+                  <th className="px-3 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={allChecked}
+                      onChange={toggleAll}
+                      className="w-4 h-4 rounded accent-[#c9a84c]"
+                    />
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider min-w-[180px]">Item</th>
+                  <th className="px-3 py-3 text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider w-16">Qty</th>
+                  <th className="px-3 py-3 text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider w-24">Price</th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold text-neutral-400 uppercase tracking-wider w-20">Match</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Destination</th>
+                  <th className="px-3 py-3 w-20"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.items.map((item, idx) => (
+                  <tr
+                    key={item.name}
+                    className={`border-b border-[#1a1f32] last:border-0 hover:bg-[#111627] transition ${
+                      sent[item.name] ? "opacity-60" : ""
+                    }`}
+                  >
+                    <td className="px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={!!checked[item.name]}
+                        onChange={(e) => setChecked((c) => ({ ...c, [item.name]: e.target.checked }))}
+                        className="w-4 h-4 rounded accent-[#c9a84c]"
+                      />
+                    </td>
+                    <td className="px-3 py-3">
+                      <p className="font-medium text-white text-sm leading-tight">{item.matched_item_name || item.description}</p>
+                      {item.product_code && (
+                        <p className="text-[11px] text-neutral-500 font-mono mt-0.5">{item.product_code}</p>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-right text-white font-mono">{item.quantity}</td>
+                    <td className="px-3 py-3 text-right text-[#c9a84c] font-mono">{fmt$$(item.unit_price)}</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className={`text-xs font-bold ${matchColor(item.match_score)}`}>
+                        {item.match_score ? `${Math.round(item.match_score)}%` : "—"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <DestButtons
+                        current={dests[item.name] || "Limbo"}
+                        hasJob={hasJob}
+                        onSelect={(d) => setDests((prev) => ({ ...prev, [item.name]: d }))}
+                        disabled={!!sent[item.name]}
+                      />
+                    </td>
+                    <td className="px-3 py-3">
+                      <SendButton
+                        onClick={() => handleSendOne(item)}
+                        loading={!!sending[item.name]}
+                        done={!!sent[item.name]}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Card view */}
+      {viewMode === "cards" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {detail.items.map((item) => (
+            <div
+              key={item.name}
+              className={`bg-[#0d1120] border border-[#1a1f32] rounded-2xl p-4 transition ${
+                sent[item.name] ? "opacity-60" : "hover:border-[#c9a84c]/30"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-white leading-tight">{item.matched_item_name || item.description}</p>
+                  {item.product_code && (
+                    <p className="text-[11px] text-neutral-500 font-mono mt-0.5">{item.product_code}</p>
+                  )}
+                </div>
+                <div className="flex-shrink-0 text-right">
+                  <p className="text-[#c9a84c] font-bold font-mono">{fmt$$(item.unit_price)}</p>
+                  <p className="text-xs text-neutral-500">Qty: {item.quantity}</p>
+                </div>
+              </div>
+
+              {item.match_score > 0 && (
+                <p className={`text-xs mb-3 ${matchColor(item.match_score)}`}>
+                  Match: {Math.round(item.match_score)}%
+                </p>
+              )}
+
+              <div className="mb-3">
+                <DestButtons
+                  current={dests[item.name] || "Limbo"}
+                  hasJob={hasJob}
+                  onSelect={(d) => setDests((prev) => ({ ...prev, [item.name]: d }))}
+                  disabled={!!sent[item.name]}
+                />
+              </div>
+
+              <SendButton
+                onClick={() => handleSendOne(item)}
+                loading={!!sending[item.name]}
+                done={!!sent[item.name]}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
+// RECEIPTS TAB
+// ──────────────────────────────────────────────
+
+function ReceiptsTab() {
+  const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
+  const [error, setError] = useState("");
+  const [dispatchingReceipt, setDispatchingReceipt] = useState<string | null>(null);
+
+  const load = useCallback(async (pg: number, filter: StatusFilter, replace: boolean) => {
+    if (pg === 1) setLoading(true); else setLoadingMore(true);
+    try {
+      const res = await fetchAllReceipts(pg, PAGE_SIZE, filter);
+      setReceipts((prev) => replace ? res.receipts : [...prev, ...res.receipts]);
+      setHasMore(res.has_more);
+      setPage(pg);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load receipts.");
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setReceipts([]);
+    load(1, statusFilter, true);
+  }, [statusFilter, load]);
+
+  if (dispatchingReceipt) {
+    return (
+      <DispatchView
+        receiptName={dispatchingReceipt}
+        onBack={() => setDispatchingReceipt(null)}
+      />
+    );
+  }
+
+  return (
+    <div>
+      {/* Filter chips */}
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
+        {(["", "Pending", "Complete", "Failed"] as StatusFilter[]).map((f) => (
+          <button
+            key={f || "all"}
+            onClick={() => setStatusFilter(f)}
+            className={`px-4 py-2 rounded-full text-xs font-semibold transition ${
+              statusFilter === f
+                ? "bg-[#c9a84c] text-[#080c18]"
+                : "bg-[#0d1120] border border-[#1a1f32] text-neutral-400 hover:text-white"
+            }`}
+          >
+            {f || "All"}
+          </button>
+        ))}
+      </div>
+
+      {/* Error */}
+      {error && <p className="text-[#dc3545] text-sm mb-4">{error}</p>}
+
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center py-24">
+          <Spinner size="lg" />
+        </div>
+      )}
+
+      {/* Empty */}
+      {!loading && receipts.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <svg className="w-10 h-10 text-neutral-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <p className="text-neutral-400 text-sm">No receipts found</p>
+        </div>
+      )}
+
+      {/* Receipt rows */}
+      {!loading && receipts.length > 0 && (
+        <div className="bg-[#0d1120] border border-[#1a1f32] rounded-2xl overflow-hidden">
+          {receipts.map((r, idx) => (
+            <div
+              key={r.name}
+              className={`flex items-center gap-4 px-5 py-4 hover:bg-[#111627] transition ${
+                idx < receipts.length - 1 ? "border-b border-[#1a1f32]" : ""
+              }`}
+            >
+              {/* Status dot */}
+              <div className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${STATUS_DOT[r.status] || "bg-neutral-600"}`} />
+
+              {/* Supplier + meta */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="font-semibold text-white text-sm">{r.supplier || "Unknown Supplier"}</span>
+                  {r.hcp_job_id && (
+                    <span className="text-xs text-[#c9a84c] font-mono">#{r.hcp_job_id}</span>
+                  )}
+                  {r.status && (
+                    <span className={`text-xs font-semibold ${STATUS_TEXT[r.status] || "text-neutral-400"}`}>
+                      {r.status}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 mt-0.5 text-[11px] text-neutral-500 flex-wrap">
+                  {r.buyer_name && (
+                    <span className="flex items-center gap-1">
+                      <span className="h-4 w-4 rounded-full bg-[#1a1f32] text-[9px] font-bold text-[#c9a84c] inline-flex items-center justify-center">
+                        {initials(r.buyer_name)}
+                      </span>
+                      {r.buyer_name}
+                    </span>
+                  )}
+                  <span>{fmtDate(r.receipt_date)}</span>
+                  {r.item_count > 0 && <span>{r.item_count} item{r.item_count !== 1 ? "s" : ""}</span>}
+                </div>
+              </div>
+
+              {/* Total */}
+              <div className="text-right flex-shrink-0">
+                <p className="font-bold text-[#c9a84c] font-mono">{fmt$$(r.parsed_total || 0)}</p>
+              </div>
+
+              {/* Dispatch button */}
+              <button
+                onClick={() => setDispatchingReceipt(r.name)}
+                className="flex-shrink-0 min-h-[36px] px-4 py-2 bg-gradient-to-br from-[#c9a84c] to-[#a8893d] text-[#080c18] font-bold rounded-lg text-xs hover:from-[#e0c068] hover:to-[#c9a84c] transition"
+              >
+                DISPATCH
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Load more */}
+      {hasMore && !loading && (
+        <div className="flex justify-center mt-6">
+          <button
+            onClick={() => load(page + 1, statusFilter, false)}
+            disabled={loadingMore}
+            className="px-6 py-2.5 bg-[#0d1120] border border-[#1a1f32] rounded-xl text-sm text-neutral-400 hover:text-white hover:border-[#c9a84c] transition disabled:opacity-50 flex items-center gap-2"
+          >
+            {loadingMore ? <><Spinner size="sm" /> Loading...</> : "Load more"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
+// WAREHOUSE DETAIL VIEW
+// ──────────────────────────────────────────────
+
+interface WarehouseDetailProps {
+  warehouse: WarehouseCard;
+  onBack: () => void;
+}
+
+function WarehouseDetail({ warehouse, onBack }: WarehouseDetailProps) {
+  const [data, setData] = useState<WarehouseStockResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [stockFilter, setStockFilter] = useState("");
+  const [error, setError] = useState("");
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const load = useCallback(async (pg: number, q: string, sf: string, replace: boolean) => {
+    if (pg === 1) setLoading(true); else setLoadingMore(true);
+    try {
+      const res = await fetchWarehouseStock(warehouse.name, pg, 50, q, sf);
+      setData((prev) =>
+        replace ? res : { ...res, items: [...(prev?.items || []), ...res.items] }
+      );
+      setPage(pg);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load stock.");
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [warehouse.name]);
+
+  useEffect(() => {
+    load(1, search, stockFilter, true);
+  }, [search, stockFilter, load]);
+
+  const handleSearchInput = (val: string) => {
+    setSearchInput(val);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setSearch(val), 350);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-6">
+        <button
+          onClick={onBack}
+          className="text-neutral-400 hover:text-[#c9a84c] transition flex items-center gap-1.5 text-sm"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Warehouses
+        </button>
+        <div className="h-4 w-px bg-[#1a1f32]" />
+        <h2 className="text-lg font-serif font-bold text-white">{warehouse.display_name || warehouse.name}</h2>
+        {warehouse.low_stock_count > 0 && (
+          <span className="text-xs bg-[#E67E22]/20 text-[#E67E22] border border-[#E67E22]/30 px-2 py-0.5 rounded-full font-semibold">
+            {warehouse.low_stock_count} low stock
+          </span>
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <div className="flex-1 min-w-[200px]">
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => handleSearchInput(e.target.value)}
+            placeholder="Search items..."
+            className="w-full bg-[#0d1120] border border-[#1a1f32] rounded-lg px-4 py-2 text-sm text-[#f0ebe0] placeholder-neutral-600 focus:outline-none focus:border-[#c9a84c] transition"
+          />
+        </div>
+        <div className="flex items-center gap-1 bg-[#0d1120] border border-[#1a1f32] rounded-xl p-1">
+          {[
+            { val: "", label: "All" },
+            { val: "low", label: "Low Stock" },
+          ].map((opt) => (
+            <button
+              key={opt.val}
+              onClick={() => setStockFilter(opt.val)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                stockFilter === opt.val
+                  ? "bg-[#c9a84c] text-[#080c18]"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error && <p className="text-[#dc3545] text-sm mb-4">{error}</p>}
+
+      {loading && (
+        <div className="flex items-center justify-center py-24">
+          <Spinner size="lg" />
+        </div>
+      )}
+
+      {!loading && data && data.items.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <p className="text-neutral-400 text-sm">No items found</p>
+        </div>
+      )}
+
+      {!loading && data && data.items.length > 0 && (
+        <div className="bg-[#0d1120] border border-[#1a1f32] rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#1a1f32]">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Item</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider w-24">Qty</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider w-28">Value/Unit</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider w-28">Total Value</th>
+                  <th className="px-4 py-3 w-24"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.items.map((item: StockItem, idx: number) => (
+                  <tr
+                    key={item.item_code}
+                    className={`border-b border-[#1a1f32] last:border-0 hover:bg-[#111627] transition ${
+                      item.is_low_stock ? "border-l-2 border-l-[#E67E22]" : ""
+                    }`}
+                  >
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-white text-sm">{item.item_name}</p>
+                      <p className="text-[11px] text-neutral-500 font-mono">{item.item_code}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-white">{item.actual_qty}</td>
+                    <td className="px-4 py-3 text-right font-mono text-neutral-400">{fmt$$(item.valuation_rate)}</td>
+                    <td className="px-4 py-3 text-right font-mono text-[#c9a84c] font-bold">{fmt$$(item.stock_value)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {item.is_low_stock && (
+                        <span className="text-[10px] font-bold text-[#E67E22] bg-[#E67E22]/10 px-2 py-0.5 rounded-full">
+                          LOW
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {data?.has_more && !loading && (
+        <div className="flex justify-center mt-6">
+          <button
+            onClick={() => load(page + 1, search, stockFilter, false)}
+            disabled={loadingMore}
+            className="px-6 py-2.5 bg-[#0d1120] border border-[#1a1f32] rounded-xl text-sm text-neutral-400 hover:text-white hover:border-[#c9a84c] transition disabled:opacity-50 flex items-center gap-2"
+          >
+            {loadingMore ? <><Spinner size="sm" /> Loading...</> : "Load more"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
+// WAREHOUSES TAB
+// ──────────────────────────────────────────────
+
+function WarehousesTab() {
+  const [data, setData] = useState<WarehouseListResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState<WarehouseCard | null>(null);
+
+  useEffect(() => {
+    fetchWarehouseList()
+      .then(setData)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load warehouses."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (selected) {
+    return <WarehouseDetail warehouse={selected} onBack={() => setSelected(null)} />;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return <p className="text-[#dc3545] text-sm">{error || "Failed to load."}</p>;
+  }
+
+  const allWarehouses: (WarehouseCard & { badge?: string })[] = [
+    ...(data.my_truck ? [{ ...data.my_truck, badge: "MY TRUCK" }] : []),
+    ...data.office.map((w) => ({ ...w, badge: "OFFICE" })),
+    ...data.other_trucks.map((w) => ({ ...w })),
+  ];
+
+  if (allWarehouses.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <p className="text-neutral-400 text-sm">No warehouses found</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* MY TRUCK hero */}
+      {data.my_truck && (
+        <div className="mb-6">
+          <p className="text-xs text-[#c9a84c] uppercase tracking-widest font-semibold mb-3">My Truck</p>
+          <button
+            onClick={() => setSelected(data.my_truck!)}
+            className="w-full sm:max-w-md text-left bg-gradient-to-br from-[#1a2040] to-[#0d1120] border border-[#c9a84c]/30 rounded-2xl p-6 hover:border-[#c9a84c]/60 hover:-translate-y-0.5 transition-all"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="font-serif font-bold text-xl text-white">{data.my_truck.display_name || data.my_truck.name}</p>
+                <p className="text-xs text-[#c9a84c] uppercase tracking-widest mt-1">My Truck</p>
+              </div>
+              <svg className="w-8 h-8 text-[#c9a84c]/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+              </svg>
+            </div>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <p className="text-2xl font-bold text-white">{data.my_truck.total_items}</p>
+                <p className="text-[10px] text-neutral-500 uppercase tracking-wider">Items</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{data.my_truck.total_qty}</p>
+                <p className="text-[10px] text-neutral-500 uppercase tracking-wider">Units</p>
+              </div>
+              <div>
+                <p className="text-lg font-bold text-[#c9a84c]">{fmt$$(data.my_truck.total_value)}</p>
+                <p className="text-[10px] text-neutral-500 uppercase tracking-wider">Value</p>
+              </div>
+            </div>
+            {data.my_truck.low_stock_count > 0 && (
+              <div className="mt-4 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-[#E67E22]" />
+                <span className="text-xs text-[#E67E22] font-semibold">{data.my_truck.low_stock_count} items low on stock</span>
+              </div>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Office + Other trucks grid */}
+      {(data.office.length > 0 || data.other_trucks.length > 0) && (
+        <div>
+          <p className="text-xs text-neutral-500 uppercase tracking-widest font-semibold mb-3">All Warehouses</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...data.office, ...data.other_trucks].map((w) => (
+              <button
+                key={w.name}
+                onClick={() => setSelected(w)}
+                className="text-left bg-[#0d1120] border border-[#1a1f32] rounded-2xl p-5 hover:border-[#c9a84c]/40 hover:-translate-y-0.5 transition-all"
+              >
+                <p className="font-serif font-semibold text-white mb-1">{w.display_name || w.name}</p>
+                <div className="grid grid-cols-3 gap-2 text-center mt-3">
+                  <div>
+                    <p className="text-lg font-bold text-white">{w.total_items}</p>
+                    <p className="text-[10px] text-neutral-500">Items</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-white">{w.total_qty}</p>
+                    <p className="text-[10px] text-neutral-500">Units</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-[#c9a84c]">{fmt$$(w.total_value)}</p>
+                    <p className="text-[10px] text-neutral-500">Value</p>
+                  </div>
+                </div>
+                {w.low_stock_count > 0 && (
+                  <div className="mt-3 flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#E67E22]" />
+                    <span className="text-[11px] text-[#E67E22]">{w.low_stock_count} low</span>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
+// LIMBO TAB
+// ──────────────────────────────────────────────
+
+function LimboTab() {
+  const [groups, setGroups] = useState<LimboGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [dests, setDests] = useState<Record<string, ItemDestination>>({});
+  const [sending, setSending] = useState<Record<string, boolean>>({});
+  const [sent, setSent] = useState<Record<string, boolean>>({});
+  const [toast, setToast] = useState("");
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3000);
+  };
+
+  useEffect(() => {
+    fetchLimboItems()
+      .then((res) => {
+        setGroups(res.groups || []);
+        const initDests: Record<string, ItemDestination> = {};
+        for (const g of res.groups || []) {
+          for (const it of g.items) {
+            initDests[it.name] = it.destination || "Limbo";
+          }
+        }
+        setDests(initDests);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load limbo items."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSend = async (item: ReceiptItem, jobName: string) => {
+    setSending((s) => ({ ...s, [item.name]: true }));
+    try {
+      await dispatchItems(jobName || "", [{
+        item_name: item.name,
+        destination: dests[item.name] || "Limbo",
+      }]);
+      setSent((s) => ({ ...s, [item.name]: true }));
+      showToast("Dispatched.");
+    } catch (e: unknown) {
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setSending((s) => ({ ...s, [item.name]: false }));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <p className="text-[#dc3545] text-sm">{error}</p>;
+  }
+
+  const totalItems = groups.reduce((acc, g) => acc + g.items.length, 0);
+
+  if (totalItems === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <div className="h-16 w-16 rounded-full bg-[#28a745]/10 flex items-center justify-center mb-4">
+          <svg className="w-8 h-8 text-[#28a745]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        </div>
+        <p className="text-white font-semibold mb-1">Limbo is clear</p>
+        <p className="text-neutral-400 text-sm">All items have been dispatched.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#0d1120] border border-[#c9a84c]/50 text-[#c9a84c] text-sm px-5 py-3 rounded-xl shadow-2xl">
+          {toast}
+        </div>
+      )}
+
+      <p className="text-xs text-[#E67E22] font-semibold uppercase tracking-wider mb-5">
+        {totalItems} item{totalItems !== 1 ? "s" : ""} in limbo
+      </p>
+
+      <div className="space-y-6">
+        {groups.map((group) => (
+          <div key={group.receipt_name}>
+            {/* Group header */}
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-xs font-bold text-[#c9a84c] uppercase tracking-wider">
+                {group.supplier || group.receipt_name}
+              </span>
+              {group.hcp_job_id && (
+                <span className="text-xs text-neutral-500 font-mono">#{group.hcp_job_id}</span>
+              )}
+              <div className="flex-1 h-px bg-[#1a1f32]" />
+              <span className="text-xs text-neutral-500">{group.items.length} item{group.items.length !== 1 ? "s" : ""}</span>
+            </div>
+
+            <div className="bg-[#0d1120] border border-[#1a1f32] rounded-2xl overflow-hidden">
+              {group.items.map((item, idx) => (
+                <div
+                  key={item.name}
+                  className={`flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-4 ${
+                    idx < group.items.length - 1 ? "border-b border-[#1a1f32]" : ""
+                  } ${sent[item.name] ? "opacity-50" : ""} hover:bg-[#111627] transition`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white text-sm">{item.matched_item_name || item.description}</p>
+                    {item.product_code && (
+                      <p className="text-[11px] text-neutral-500 font-mono">{item.product_code}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-1 text-[11px] text-neutral-500">
+                      <span>Qty: {item.quantity}</span>
+                      <span>{fmt$$(item.unit_price)}</span>
+                      {item.match_score > 0 && (
+                        <span className={matchColor(item.match_score)}>
+                          {Math.round(item.match_score)}% match
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex-shrink-0">
+                    <DestButtons
+                      current={dests[item.name] || "Limbo"}
+                      hasJob={!!group.hcp_job}
+                      onSelect={(d) => setDests((prev) => ({ ...prev, [item.name]: d }))}
+                      disabled={!!sent[item.name]}
+                    />
+                  </div>
+
+                  <SendButton
+                    onClick={() => handleSend(item, group.hcp_job)}
+                    loading={!!sending[item.name]}
+                    done={!!sent[item.name]}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
+// MAIN PAGE
+// ──────────────────────────────────────────────
+
+export default function InventoryPage() {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<MainTab>("receipts");
+  const [summary, setSummary] = useState({ pending_receipts: 0, pending_limbo_items: 0, restock_items: 0 });
+
+  useEffect(() => {
+    if (!getAuth()) {
+      router.replace("/manager");
+      return;
+    }
+    // Fetch summary for badge counts
+    import("@/lib/inventory-api").then(({ fetchInventorySummary }) => {
+      fetchInventorySummary()
+        .then(setSummary)
+        .catch(() => {/* non-critical */});
+    });
+  }, [router]);
+
+  const TABS: { key: MainTab; label: string; badge?: number }[] = [
+    { key: "receipts", label: "RECEIPTS", badge: summary.pending_receipts || undefined },
+    { key: "warehouses", label: "WAREHOUSES" },
+    { key: "limbo", label: "LIMBO", badge: summary.pending_limbo_items || undefined },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#080c18]">
+      {/* Nav */}
+      <nav className="bg-[#0d1120] border-b border-[#1a1f32] sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/manager/dashboard"
+              className="text-sm text-neutral-400 hover:text-[#c9a84c] transition flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Dashboard
+            </Link>
+            <div className="h-4 w-px bg-[#1a1f32]" />
+            <h1 className="text-sm font-bold tracking-widest text-white uppercase">Inventory</h1>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-neutral-500">
+            {summary.pending_receipts > 0 && (
+              <span className="bg-[#E67E22]/20 text-[#E67E22] px-2 py-0.5 rounded-full font-semibold">
+                {summary.pending_receipts} pending
+              </span>
+            )}
+            {summary.pending_limbo_items > 0 && (
+              <span className="bg-[#E67E22]/20 text-[#E67E22] px-2 py-0.5 rounded-full font-semibold">
+                {summary.pending_limbo_items} in limbo
+              </span>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* Sub-tab bar */}
+      <div className="bg-[#0d1120] border-b border-[#1a1f32] sticky top-[53px] z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center gap-1">
+            {TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`relative px-5 py-3 text-xs font-bold tracking-widest uppercase transition border-b-2 ${
+                  activeTab === tab.key
+                    ? "border-[#c9a84c] text-[#c9a84c]"
+                    : "border-transparent text-neutral-500 hover:text-neutral-300"
+                }`}
+              >
+                {tab.label}
+                {tab.badge !== undefined && tab.badge > 0 && (
+                  <span className="ml-2 bg-[#E67E22] text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] inline-flex items-center justify-center px-1">
+                    {tab.badge > 99 ? "99+" : tab.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {activeTab === "receipts" && <ReceiptsTab />}
+        {activeTab === "warehouses" && <WarehousesTab />}
+        {activeTab === "limbo" && <LimboTab />}
+      </main>
+    </div>
+  );
+}

@@ -222,6 +222,9 @@ export default function DashboardPage() {
             <Link href="/manager/pricing" className="text-sm text-neutral-300 hover:text-gold-light transition">
               Pricing
             </Link>
+            <Link href="/manager/inventory" className="text-sm text-neutral-300 hover:text-gold-light transition">
+              Inventory
+            </Link>
             <Link href="/manager/admin/invite" className="text-sm text-neutral-300 hover:text-gold-light transition hidden lg:inline" title="Generate magic-link login for office staff">
               Invite
             </Link>
