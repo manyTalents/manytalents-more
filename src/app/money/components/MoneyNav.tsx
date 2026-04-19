@@ -8,6 +8,7 @@ const TABS = [
   { href: "/money/hub", label: "Hub" },
   { href: "/money/veoe", label: "VEOE" },
   { href: "/money/crypto", label: "The Machine" },
+  { href: "/money/options", label: "Options" },
 ];
 
 export default function MoneyNav() {
