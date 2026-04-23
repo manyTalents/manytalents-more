@@ -17,7 +17,7 @@ export interface Settings {
 
 export interface AnalysisRun {
   id: string                         // uuid
-  status: 'running' | 'done' | 'error'
+  status: 'running' | 'completed' | 'failed'
   started_at: string                 // timestamp
   completed_at: string | null
   macro_summary: string | null
@@ -102,7 +102,7 @@ export interface ExecuteRequest {
 
 export interface AnalyzeResponse {
   run_id: string
-  status: 'running' | 'done' | 'error'
+  status: 'running' | 'completed' | 'failed'
 }
 
 export interface ExecuteResponse {

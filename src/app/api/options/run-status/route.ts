@@ -12,7 +12,7 @@ export async function GET() {
   const { data: latestRun } = await supabase
     .from('analysis_runs')
     .select('id, completed_at, status')
-    .eq('status', 'done')
+    .eq('status', 'completed')
     .order('completed_at', { ascending: false })
     .limit(1)
     .single()
