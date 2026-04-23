@@ -436,7 +436,8 @@ export default function TeamPage() {
                     <th className="text-left py-2 px-4">Email</th>
                     <th className="text-left py-2 px-4">Role</th>
                     <th className="text-left py-2 px-4">Truck</th>
-                    <th className="text-center py-2 pl-4">App</th>
+                    <th className="text-center py-2 px-4">App</th>
+                    <th className="text-right py-2 pl-4"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -448,11 +449,34 @@ export default function TeamPage() {
                         {t.van ? "Lead Tech" : t.email ? "Helper" : "—"}
                       </td>
                       <td className="py-3 px-4 text-neutral-400">{t.van ? t.van.replace(" - AT", "") : "Floats"}</td>
-                      <td className="py-3 pl-4 text-center">
+                      <td className="py-3 px-4 text-center">
                         {t.has_app_access ? (
                           <span className="text-emerald-400 text-xs font-medium">Active</span>
                         ) : (
                           <span className="text-neutral-600 text-xs">No keys</span>
+                        )}
+                      </td>
+                      <td className="py-3 pl-4 text-right">
+                        {t.email && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await onboardTech({
+                                  email: t.email,
+                                  fullName: t.name,
+                                  vanWarehouse: t.van || "",
+                                });
+                                setResult(res);
+                                setOfficeResult(null);
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                              } catch (err: any) {
+                                setError(err.message || "Failed to generate QR");
+                              }
+                            }}
+                            className="text-xs text-gold hover:text-gold-light transition font-medium"
+                          >
+                            Generate QR
+                          </button>
                         )}
                       </td>
                     </tr>
