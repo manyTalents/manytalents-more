@@ -193,14 +193,14 @@ export async function dispatchItems(
   jobName: string,
   items: DispatchItemInput[]
 ): Promise<DispatchResult> {
-  return callMethod<DispatchResult>(`${INV_API}.dispatch_items`, {
+  return callMethod<DispatchResult>(`${LIMBO_API}.dispatch_items`, {
     hcp_job_name: jobName,
     items_json: JSON.stringify(items),
   });
 }
 
 export async function dispatchAllToJob(jobName: string): Promise<DispatchResult> {
-  return callMethod<DispatchResult>(`${INV_API}.dispatch_all_to_job`, {
+  return callMethod<DispatchResult>(`${LIMBO_API}.dispatch_all_to_job`, {
     hcp_job_name: jobName,
   });
 }

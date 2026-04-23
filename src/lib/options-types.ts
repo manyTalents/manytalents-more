@@ -119,3 +119,55 @@ export interface CloseResponse {
   exit_price?: number
   realized_pnl?: number
 }
+
+// ── Monetization Types ───────────────────────────────────────────────────────
+
+export type Tier = 3 | 5 | 10
+
+export interface TeaserRecommendation {
+  id: string
+  rank: number
+  ticker: string | null       // visible for top 3, null for 4-10
+  direction: 'bull' | 'bear' | 'neutral' | null
+  confidence: number | null   // visible for top 3, null for 4-10
+  expected_return_pct: number | null
+}
+
+export interface Purchase {
+  id: string
+  stripe_session_id: string
+  email: string | null
+  run_id: string
+  tier: Tier
+  amount_cents: number
+  acknowledged_disclaimer: boolean
+  created_at: string
+}
+
+export interface Subscriber {
+  id: string
+  email: string
+  stripe_customer_id: string
+  status: 'active' | 'cancelled' | 'past_due'
+  runs_today: number
+  last_run_date: string | null
+  created_at: string
+}
+
+export interface RunStatus {
+  has_cached_run: boolean
+  run_id: string | null
+  completed_at: string | null
+  next_available_in_seconds: number | null
+}
+
+export interface CheckoutResponse {
+  url: string
+}
+
+export interface GatedRecommendationsResponse {
+  tier: Tier
+  recommendations: Recommendation[]
+  run_id: string
+  completed_at: string
+}
