@@ -11,7 +11,7 @@ import {
   createInvoiceForJob,
   markInvoiced,
   markPaid,
-  revertStatus,
+  revertWithNote,
   updateJobServices,
   getDefaultLaborRate,
 } from "@/lib/frappe";
@@ -39,16 +39,16 @@ async function createAndMarkInvoiced(jobName: string, sendEmail: boolean) {
 }
 
 // Workflow action config per status
-const WORKFLOW_ACTIONS: Record<
-  string,
-  Array<{
-    label: string;
-    action: (jobName: string) => Promise<any>;
-    color: string;
-    confirm?: string;
-    secondary?: boolean;
-  }>
-> = {
+interface WorkflowAction {
+  label: string;
+  action: (jobName: string) => Promise<any>;
+  color: string;
+  confirm?: string;
+  secondary?: boolean;
+  sendBack?: string; // target status — triggers note popup instead of direct action
+}
+
+const WORKFLOW_ACTIONS: Record<string, WorkflowAction[]> = {
   Completed: [
     {
       label: "Send to Check",
@@ -63,10 +63,11 @@ const WORKFLOW_ACTIONS: Record<
       color: "from-blue-600 to-blue-700",
     },
     {
-      label: "Back to Completed",
-      action: (name) => revertStatus(name, "Completed"),
+      label: "Send Back",
+      action: () => Promise.resolve(),
       color: "from-neutral-600 to-neutral-700",
       secondary: true,
+      sendBack: "Completed",
     },
   ],
   Checked: [
@@ -83,10 +84,11 @@ const WORKFLOW_ACTIONS: Record<
       confirm: "Create and email the invoice to the customer?",
     },
     {
-      label: "Back to Needs Check",
-      action: (name) => revertStatus(name, "Needs Check"),
+      label: "Send Back",
+      action: () => Promise.resolve(),
       color: "from-neutral-600 to-neutral-700",
       secondary: true,
+      sendBack: "Needs Check",
     },
   ],
   Invoiced: [
@@ -97,10 +99,11 @@ const WORKFLOW_ACTIONS: Record<
       confirm: "Mark this job as paid?",
     },
     {
-      label: "Back to Checked",
-      action: (name) => revertStatus(name, "Checked"),
+      label: "Send Back",
+      action: () => Promise.resolve(),
       color: "from-neutral-600 to-neutral-700",
       secondary: true,
+      sendBack: "Checked",
     },
   ],
 };
@@ -124,6 +127,10 @@ export default function JobDetailPage() {
   const [savingServices, setSavingServices] = useState(false);
   const [defaultRate, setDefaultRate] = useState(155);
   const [invoiceInfo, setInvoiceInfo] = useState<{ name: string; url: string } | null>(null);
+
+  // Send-back modal
+  const [sendBackTarget, setSendBackTarget] = useState<string | null>(null);
+  const [sendBackNote, setSendBackNote] = useState("");
 
   const loadJob = () => {
     setLoading(true);
@@ -231,6 +238,28 @@ export default function JobDetailPage() {
     }
   };
 
+  const handleSendBack = async () => {
+    if (!sendBackTarget) return;
+    if (!sendBackNote.trim()) {
+      setError("Please add a note explaining why this is being sent back.");
+      return;
+    }
+    setActing(true);
+    setError("");
+    setActionResult("");
+    try {
+      await revertWithNote(jobName, sendBackTarget, sendBackNote);
+      setActionResult(`Sent back to ${sendBackTarget}`);
+      setSendBackTarget(null);
+      setSendBackNote("");
+      loadJob();
+    } catch (err: any) {
+      setError(err.message || "Send back failed");
+    } finally {
+      setActing(false);
+    }
+  };
+
   const fmtCurrency = (n: number) =>
     `$${(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -327,11 +356,19 @@ export default function JobDetailPage() {
               {actions.filter(a => a.secondary).map((a, i) => (
                 <button
                   key={`s${i}`}
-                  onClick={() => handleAction(a.action, a.confirm)}
+                  onClick={() => {
+                    if (a.sendBack) {
+                      setSendBackTarget(a.sendBack);
+                      setSendBackNote("");
+                      setError("");
+                    } else {
+                      handleAction(a.action, a.confirm);
+                    }
+                  }}
                   disabled={acting}
                   className="text-sm text-neutral-500 hover:text-cream border border-navy-border px-4 py-2 rounded-lg transition disabled:opacity-60"
                 >
-                  {acting ? "..." : a.label}
+                  {a.label}
                 </button>
               ))}
             </div>
@@ -693,6 +730,44 @@ export default function JobDetailPage() {
           </div>
         )}
       </main>
+
+      {/* Send-back modal */}
+      {sendBackTarget && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-navy-surface border border-navy-border rounded-2xl p-6 w-full max-w-md">
+            <h3 className="font-serif text-lg font-bold mb-1">Send Back to {sendBackTarget}</h3>
+            <p className="text-sm text-neutral-500 mb-4">
+              What needs to be fixed? This note will be saved on the job.
+            </p>
+            <textarea
+              value={sendBackNote}
+              onChange={(e) => setSendBackNote(e.target.value)}
+              placeholder="e.g. Missing labor description, wrong address, need receipt for materials..."
+              rows={3}
+              autoFocus
+              className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream text-sm focus:outline-none focus:border-gold-dark transition resize-none mb-4"
+            />
+            {error && (
+              <p className="text-red-400 text-sm mb-3">{error}</p>
+            )}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => { setSendBackTarget(null); setError(""); }}
+                className="text-sm text-neutral-500 hover:text-cream px-4 py-2 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendBack}
+                disabled={acting}
+                className="bg-gradient-to-br from-amber-600 to-amber-700 text-white font-bold px-5 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-60"
+              >
+                {acting ? "Sending..." : "Send Back"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

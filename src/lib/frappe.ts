@@ -137,6 +137,18 @@ export async function revertStatus(jobName: string, targetStatus: string) {
   return await callMethod(`${API}.revert_status`, { job_name: jobName, target_status: targetStatus });
 }
 
+export async function addJobNote(jobName: string, noteText: string) {
+  return await callMethod(`${API}.add_job_note`, { job_name: jobName, note_text: noteText });
+}
+
+/** Revert status AND add a note explaining why */
+export async function revertWithNote(jobName: string, targetStatus: string, note: string) {
+  if (note.trim()) {
+    await addJobNote(jobName, `Sent back to ${targetStatus}: ${note.trim()}`);
+  }
+  return await revertStatus(jobName, targetStatus);
+}
+
 // ──────────────────────────────────────────────
 // Job Intake & Labor/Service Management
 // ──────────────────────────────────────────────
