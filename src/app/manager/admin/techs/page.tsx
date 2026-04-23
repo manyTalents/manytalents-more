@@ -2,15 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAuth, onboardTech, listTechs, onboardNewUser, createInvite, type TechListItem, type OnboardTechResponse } from "@/lib/frappe";
+import {
+  getAuth,
+  onboardTech,
+  listTechs,
+  onboardNewUser,
+  createInvite,
+  type TechListItem,
+  type OnboardTechResponse,
+} from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 
-type PersonRole = "lead_tech" | "helper" | "office";
+type PersonRole = "lead_tech" | "helper" | "office" | "office_field";
 
 const ROLE_OPTIONS: { value: PersonRole; label: string; description: string }[] = [
   { value: "lead_tech", label: "Lead Tech", description: "Has their own truck, goes on jobs" },
   { value: "helper", label: "Helper / Apprentice", description: "No truck, rides with a lead tech, assigned on jobs" },
-  { value: "office", label: "Office Staff", description: "Web dashboard only, no mobile app" },
+  { value: "office_field", label: "Office + Mobile", description: "Web dashboard AND mobile app — for office staff who also do inventory, inspections, etc." },
+  { value: "office", label: "Office Only", description: "Web dashboard only, no mobile app needed" },
 ];
 
 const VAN_OPTIONS = [
@@ -62,7 +71,7 @@ export default function TeamPage() {
     setSubmitting(true);
     try {
       if (role === "office") {
-        // Office staff — create user with office role + magic link
+        // Office only — web dashboard + magic link, no mobile app
         const res = await onboardNewUser({
           email: email.trim().toLowerCase(),
           fullName: fullName.trim(),
@@ -74,8 +83,32 @@ export default function TeamPage() {
           name: fullName.trim(),
           inviteUrl: res.invite_url,
         });
+      } else if (role === "office_field") {
+        // Office + mobile — create tech account (gets Employee + API keys for app)
+        // then also give them office web access via invite link
+        const techRes = await onboardTech({
+          email: email.trim().toLowerCase(),
+          fullName: fullName.trim(),
+          vanWarehouse: "",
+        });
+        // Generate web login link too
+        let inviteUrl = "";
+        try {
+          const inviteRes = await createInvite(email.trim().toLowerCase(), false);
+          inviteUrl = inviteRes.invite_url;
+        } catch {
+          // User might already have office access — that's fine
+        }
+        setResult(techRes);
+        if (inviteUrl) {
+          setOfficeResult({
+            email: techRes.user_email,
+            name: fullName.trim(),
+            inviteUrl,
+          });
+        }
       } else {
-        // Lead tech or helper — both get mobile app access
+        // Lead tech or helper — mobile app access
         const res = await onboardTech({
           email: email.trim().toLowerCase(),
           fullName: fullName.trim(),
@@ -196,7 +229,7 @@ export default function TeamPage() {
                 disabled={submitting}
                 className="w-full bg-gradient-to-br from-gold to-gold-dark text-navy font-bold py-3 rounded-lg hover:from-gold-light hover:to-gold transition disabled:opacity-60"
               >
-                {submitting ? "Setting up..." : role === "office" ? "Add & Generate Login Link" : "Add & Generate QR Code"}
+                {submitting ? "Setting up..." : role === "office" ? "Add & Generate Login Link" : role === "office_field" ? "Add & Generate QR + Login Link" : "Add & Generate QR Code"}
               </button>
             </div>
           </div>
@@ -204,7 +237,7 @@ export default function TeamPage() {
           {/* Result Panel */}
           <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
             {result ? (
-              /* QR code for tech / helper */
+              /* QR code for tech / helper / office+field */
               <div>
                 <p className="text-xs uppercase tracking-wider text-neutral-400 mb-4">Mobile App QR Code</p>
                 <div className="text-center">
@@ -213,7 +246,7 @@ export default function TeamPage() {
                   <p className="text-xs text-neutral-600 mb-4">
                     {result.van_warehouse
                       ? `Lead Tech — ${result.van_warehouse.replace(" - AT", "")}`
-                      : "Helper / Apprentice"
+                      : officeResult ? "Office + Mobile App" : "Helper / Apprentice"
                     }
                   </p>
 
@@ -227,13 +260,21 @@ export default function TeamPage() {
                     />
                   </div>
 
-                  <p className="text-xs text-neutral-500 mb-4">
+                  <p className="text-xs text-neutral-500 mb-2">
                     Open the app &rarr; Scan QR &rarr; done
                   </p>
 
+                  {/* Also show login link if they got office access too */}
+                  {officeResult && (
+                    <div className="bg-navy border border-navy-border rounded-lg p-3 mt-4 mb-2 text-left">
+                      <p className="text-xs text-neutral-500 mb-1">Web dashboard login link:</p>
+                      <p className="text-xs text-gold font-mono break-all select-all">{officeResult.inviteUrl}</p>
+                    </div>
+                  )}
+
                   <button
-                    onClick={() => setResult(null)}
-                    className="text-xs text-neutral-500 hover:text-gold-light transition"
+                    onClick={() => { setResult(null); setOfficeResult(null); }}
+                    className="mt-3 text-xs text-neutral-500 hover:text-gold-light transition"
                   >
                     Done — add another person
                   </button>
