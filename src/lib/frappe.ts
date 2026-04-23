@@ -322,6 +322,44 @@ export async function checkOfficeAccess(): Promise<{ is_office: boolean; is_admi
 }
 
 // ──────────────────────────────────────────────
+// Tech Onboarding
+// ──────────────────────────────────────────────
+
+export interface OnboardTechResponse {
+  user_email: string;
+  full_name: string;
+  api_key: string;
+  api_secret: string;
+  user_created: boolean;
+  van_warehouse: string;
+  site_url: string;
+}
+
+export async function onboardTech(params: {
+  email: string;
+  fullName: string;
+  vanWarehouse?: string;
+}): Promise<OnboardTechResponse> {
+  return await callMethod<OnboardTechResponse>(`${AUTH_API}.onboard_tech`, {
+    email: params.email,
+    full_name: params.fullName,
+    van_warehouse: params.vanWarehouse || "",
+  });
+}
+
+export interface TechListItem {
+  employee: string;
+  name: string;
+  email: string;
+  van: string;
+  has_app_access: boolean;
+}
+
+export async function listTechs(): Promise<TechListItem[]> {
+  return await callMethod<TechListItem[]>(`${AUTH_API}.list_techs`);
+}
+
+// ──────────────────────────────────────────────
 // Access Approvers management
 // ──────────────────────────────────────────────
 
