@@ -16,10 +16,10 @@ import NavBar from "@/app/manager/components/NavBar";
 type PersonRole = "lead_tech" | "helper" | "office" | "office_field";
 
 const ROLE_OPTIONS: { value: PersonRole; label: string; description: string }[] = [
-  { value: "lead_tech", label: "Lead Tech", description: "Has their own truck, goes on jobs" },
-  { value: "helper", label: "Helper / Apprentice", description: "No truck, rides with a lead tech, assigned on jobs" },
-  { value: "office_field", label: "Office + Mobile", description: "Web dashboard AND mobile app — for office staff who also do inventory, inspections, etc." },
-  { value: "office", label: "Office Only", description: "Web dashboard only, no mobile app needed" },
+  { value: "lead_tech", label: "Lead Tech", description: "Has their own truck, runs jobs" },
+  { value: "helper", label: "Helper / Apprentice", description: "No truck, floats with different leads, assigned on jobs" },
+  { value: "office_field", label: "Office + Mobile", description: "Web dashboard AND mobile app (e.g., Zach — office + inventory/restock)" },
+  { value: "office", label: "Office Only", description: "Web dashboard only, no mobile app" },
 ];
 
 const VAN_OPTIONS = [
@@ -32,22 +32,52 @@ const VAN_OPTIONS = [
   "Warrens Truck - AT",
 ];
 
+const DESIGNATIONS = [
+  "Lead Plumber",
+  "Lead Electrician",
+  "Lead HVAC Tech",
+  "Plumber",
+  "Electrician",
+  "HVAC Tech",
+  "Helper",
+  "Apprentice",
+  "Office Manager",
+  "Office Staff",
+];
+
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 10);
+  if (digits.length === 0) return "";
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 export default function TeamPage() {
   const router = useRouter();
   const [techs, setTechs] = useState<TechListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Form
+  // Form — basic
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<PersonRole>("lead_tech");
   const [van, setVan] = useState("");
+
+  // Form — employee details
+  const [phone, setPhone] = useState("");
+  const [designation, setDesignation] = useState("");
+  const [emergencyName, setEmergencyName] = useState("");
+  const [emergencyPhone, setEmergencyPhone] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   // Result
   const [result, setResult] = useState<OnboardTechResponse | null>(null);
   const [officeResult, setOfficeResult] = useState<{ email: string; name: string; inviteUrl: string } | null>(null);
+
+  const needsMobileApp = role !== "office";
 
   useEffect(() => {
     if (!getAuth()) { router.replace("/manager"); return; }
@@ -61,6 +91,16 @@ export default function TeamPage() {
       .finally(() => setLoading(false));
   };
 
+  const resetForm = () => {
+    setFullName("");
+    setEmail("");
+    setVan("");
+    setPhone("");
+    setDesignation("");
+    setEmergencyName("");
+    setEmergencyPhone("");
+  };
+
   const handleSubmit = async () => {
     setError("");
     setResult(null);
@@ -71,7 +111,6 @@ export default function TeamPage() {
     setSubmitting(true);
     try {
       if (role === "office") {
-        // Office only — web dashboard + magic link, no mobile app
         const res = await onboardNewUser({
           email: email.trim().toLowerCase(),
           fullName: fullName.trim(),
@@ -84,21 +123,20 @@ export default function TeamPage() {
           inviteUrl: res.invite_url,
         });
       } else if (role === "office_field") {
-        // Office + mobile — create tech account (gets Employee + API keys for app)
-        // then also give them office web access via invite link
         const techRes = await onboardTech({
           email: email.trim().toLowerCase(),
           fullName: fullName.trim(),
           vanWarehouse: "",
+          phone: phone.replace(/\D/g, ""),
+          designation: designation,
+          emergencyName: emergencyName.trim(),
+          emergencyPhone: emergencyPhone.replace(/\D/g, ""),
         });
-        // Generate web login link too
         let inviteUrl = "";
         try {
           const inviteRes = await createInvite(email.trim().toLowerCase(), false);
           inviteUrl = inviteRes.invite_url;
-        } catch {
-          // User might already have office access — that's fine
-        }
+        } catch { /* already has office access */ }
         setResult(techRes);
         if (inviteUrl) {
           setOfficeResult({
@@ -108,17 +146,18 @@ export default function TeamPage() {
           });
         }
       } else {
-        // Lead tech or helper — mobile app access
         const res = await onboardTech({
           email: email.trim().toLowerCase(),
           fullName: fullName.trim(),
           vanWarehouse: role === "lead_tech" ? van : "",
+          phone: phone.replace(/\D/g, ""),
+          designation: designation,
+          emergencyName: emergencyName.trim(),
+          emergencyPhone: emergencyPhone.replace(/\D/g, ""),
         });
         setResult(res);
       }
-      setFullName("");
-      setEmail("");
-      setVan("");
+      resetForm();
       loadTechs();
     } catch (err: any) {
       setError(err.message || "Failed to add person");
@@ -143,25 +182,25 @@ export default function TeamPage() {
     <div className="min-h-screen">
       <NavBar />
 
-      <main className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+      <main className="max-w-5xl mx-auto px-6 py-8 space-y-8">
         <div>
           <h2 className="text-2xl font-serif font-bold">Team Setup</h2>
-          <p className="text-sm text-neutral-500 mt-1">Add techs, helpers, and office staff. Techs and helpers get a QR code for the mobile app.</p>
+          <p className="text-sm text-neutral-500 mt-1">Onboard employees, assign trucks, generate app access. Creates the full Employee record in ERPNext.</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Add Person Form */}
-          <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* Add Person Form — 3 cols */}
+          <div className="lg:col-span-3 bg-navy-surface border border-navy-border rounded-2xl p-6">
             <p className="text-xs uppercase tracking-wider text-neutral-400 mb-4">Add Team Member</p>
             <div className="space-y-4">
               {/* Role selector */}
               <div>
                 <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-2">Role</label>
-                <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
                   {ROLE_OPTIONS.map((opt) => (
                     <label
                       key={opt.value}
-                      className={`flex items-start gap-3 cursor-pointer select-none p-3 rounded-lg border transition ${
+                      className={`flex items-start gap-2.5 cursor-pointer select-none p-3 rounded-lg border transition ${
                         role === opt.value
                           ? "border-gold-dark bg-gold-dark/10"
                           : "border-navy-border bg-navy hover:border-neutral-700"
@@ -184,25 +223,55 @@ export default function TeamPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">Full Name</label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Glen Smith"
-                  className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
-                />
+              {/* Name + Email row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">Full Name *</label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Glen Smith"
+                    className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">Email *</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="glen@manytalentsmore.com"
+                    className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="glen@manytalentsmore.com"
-                  className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
-                />
+
+              {/* Phone + Designation row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">Phone</label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(formatPhone(e.target.value))}
+                    placeholder="(318) 555-1234"
+                    className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">Designation</label>
+                  <select
+                    value={designation}
+                    onChange={(e) => setDesignation(e.target.value)}
+                    className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
+                  >
+                    <option value="">Select...</option>
+                    {DESIGNATIONS.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Truck — only for lead tech */}
@@ -222,6 +291,35 @@ export default function TeamPage() {
                 </div>
               )}
 
+              {/* Emergency contact */}
+              {needsMobileApp && (
+                <div className="pt-2 border-t border-navy-border">
+                  <p className="text-xs uppercase tracking-wider text-neutral-500 mb-3">Emergency Contact</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-neutral-600 mb-1">Name</label>
+                      <input
+                        type="text"
+                        value={emergencyName}
+                        onChange={(e) => setEmergencyName(e.target.value)}
+                        placeholder="Jane Smith"
+                        className="w-full bg-navy border border-navy-border rounded-lg px-4 py-2.5 text-cream text-sm focus:outline-none focus:border-gold-dark transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-neutral-600 mb-1">Phone</label>
+                      <input
+                        type="tel"
+                        value={emergencyPhone}
+                        onChange={(e) => setEmergencyPhone(formatPhone(e.target.value))}
+                        placeholder="(318) 555-5678"
+                        className="w-full bg-navy border border-navy-border rounded-lg px-4 py-2.5 text-cream text-sm focus:outline-none focus:border-gold-dark transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {error && <p className="text-red-400 text-sm">{error}</p>}
 
               <button
@@ -234,10 +332,9 @@ export default function TeamPage() {
             </div>
           </div>
 
-          {/* Result Panel */}
-          <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+          {/* Result Panel — 2 cols */}
+          <div className="lg:col-span-2 bg-navy-surface border border-navy-border rounded-2xl p-6">
             {result ? (
-              /* QR code for tech / helper / office+field */
               <div>
                 <p className="text-xs uppercase tracking-wider text-neutral-400 mb-4">Mobile App QR Code</p>
                 <div className="text-center">
@@ -246,7 +343,7 @@ export default function TeamPage() {
                   <p className="text-xs text-neutral-600 mb-4">
                     {result.van_warehouse
                       ? `Lead Tech — ${result.van_warehouse.replace(" - AT", "")}`
-                      : officeResult ? "Office + Mobile App" : "Helper / Apprentice"
+                      : officeResult ? "Office + Mobile" : "Helper"
                     }
                   </p>
 
@@ -254,8 +351,8 @@ export default function TeamPage() {
                     <img
                       src={qrImageUrl}
                       alt="QR Code for mobile app login"
-                      width={280}
-                      height={280}
+                      width={240}
+                      height={240}
                       style={{ imageRendering: "pixelated" }}
                     />
                   </div>
@@ -264,10 +361,9 @@ export default function TeamPage() {
                     Open the app &rarr; Scan QR &rarr; done
                   </p>
 
-                  {/* Also show login link if they got office access too */}
                   {officeResult && (
-                    <div className="bg-navy border border-navy-border rounded-lg p-3 mt-4 mb-2 text-left">
-                      <p className="text-xs text-neutral-500 mb-1">Web dashboard login link:</p>
+                    <div className="bg-navy border border-navy-border rounded-lg p-3 mt-3 mb-2 text-left">
+                      <p className="text-xs text-neutral-500 mb-1">Web dashboard login:</p>
                       <p className="text-xs text-gold font-mono break-all select-all">{officeResult.inviteUrl}</p>
                     </div>
                   )}
@@ -276,58 +372,43 @@ export default function TeamPage() {
                     onClick={() => { setResult(null); setOfficeResult(null); }}
                     className="mt-3 text-xs text-neutral-500 hover:text-gold-light transition"
                   >
-                    Done — add another person
+                    Done — add another
                   </button>
                 </div>
               </div>
             ) : officeResult ? (
-              /* Login link for office staff */
               <div>
                 <p className="text-xs uppercase tracking-wider text-neutral-400 mb-4">Office Login Link</p>
                 <div className="text-center">
                   <p className="text-lg font-serif font-bold mb-1">{officeResult.name}</p>
                   <p className="text-sm text-neutral-500 mb-4">{officeResult.email}</p>
-
                   <div className="bg-navy border border-navy-border rounded-lg p-4 mb-4 text-left">
-                    <p className="text-xs text-neutral-500 mb-2">Send them this link to log in:</p>
+                    <p className="text-xs text-neutral-500 mb-2">Send them this link:</p>
                     <p className="text-sm text-gold font-mono break-all select-all">{officeResult.inviteUrl}</p>
                   </div>
-
-                  <p className="text-xs text-neutral-500 mb-4">
-                    Link expires in 15 minutes. They can request a new one from the login page after that.
-                  </p>
-
+                  <p className="text-xs text-neutral-500 mb-4">Expires in 15 min. They can request a new one from the login page.</p>
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(officeResult.inviteUrl);
-                    }}
+                    onClick={() => navigator.clipboard.writeText(officeResult.inviteUrl)}
                     className="text-xs bg-navy border border-navy-border px-4 py-2 rounded-lg text-cream hover:border-gold-dark transition mb-3"
                   >
                     Copy Link
                   </button>
-
                   <br />
                   <button
                     onClick={() => setOfficeResult(null)}
                     className="text-xs text-neutral-500 hover:text-gold-light transition mt-2"
                   >
-                    Done — add another person
+                    Done — add another
                   </button>
                 </div>
               </div>
             ) : (
-              /* Empty state */
               <div>
                 <p className="text-xs uppercase tracking-wider text-neutral-400 mb-4">Result</p>
-                <div className="flex items-center justify-center h-64 text-neutral-600">
+                <div className="flex items-center justify-center h-48 text-neutral-600">
                   <div className="text-center">
                     <p className="mb-2">{selectedRoleInfo?.label || "Select a role"}</p>
-                    <p className="text-xs">
-                      {role === "office"
-                        ? "Login link will appear here"
-                        : "QR code will appear here"
-                      }
-                    </p>
+                    <p className="text-xs">{role === "office" ? "Login link appears here" : "QR code appears here"}</p>
                   </div>
                 </div>
               </div>
@@ -362,11 +443,11 @@ export default function TeamPage() {
                   {techs.map((t) => (
                     <tr key={t.employee} className="border-b border-navy-border/50">
                       <td className="py-3 pr-4 text-cream font-medium">{t.name}</td>
-                      <td className="py-3 px-4 text-neutral-400">{t.email || "—"}</td>
+                      <td className="py-3 px-4 text-neutral-400 text-xs">{t.email || "—"}</td>
                       <td className="py-3 px-4 text-neutral-400">
                         {t.van ? "Lead Tech" : t.email ? "Helper" : "—"}
                       </td>
-                      <td className="py-3 px-4 text-neutral-400">{t.van ? t.van.replace(" - AT", "") : "—"}</td>
+                      <td className="py-3 px-4 text-neutral-400">{t.van ? t.van.replace(" - AT", "") : "Floats"}</td>
                       <td className="py-3 pl-4 text-center">
                         {t.has_app_access ? (
                           <span className="text-emerald-400 text-xs font-medium">Active</span>

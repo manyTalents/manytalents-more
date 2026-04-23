@@ -339,11 +339,19 @@ export async function onboardTech(params: {
   email: string;
   fullName: string;
   vanWarehouse?: string;
+  phone?: string;
+  designation?: string;
+  emergencyName?: string;
+  emergencyPhone?: string;
 }): Promise<OnboardTechResponse> {
   return await callMethod<OnboardTechResponse>(`${AUTH_API}.onboard_tech`, {
     email: params.email,
     full_name: params.fullName,
     van_warehouse: params.vanWarehouse || "",
+    phone: params.phone || "",
+    designation: params.designation || "",
+    emergency_name: params.emergencyName || "",
+    emergency_phone: params.emergencyPhone || "",
   });
 }
 
