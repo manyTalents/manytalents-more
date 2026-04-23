@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { getAuth, getJobsByStatus } from "@/lib/frappe";
+import NavBar from "@/app/manager/components/NavBar";
 
 const SECTION_TITLES: Record<string, { label: string; subtitle: string }> = {
   finished: {
@@ -81,22 +82,15 @@ export default function SectionPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Nav */}
-      <nav className="border-b border-navy-border bg-navy-surface/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-4">
-          <Link
-            href="/manager/dashboard"
-            className="text-neutral-400 hover:text-gold-light transition"
-          >
-            ← Dashboard
-          </Link>
-          <div className="h-5 w-px bg-navy-border" />
-          <div>
-            <h1 className="font-serif text-lg font-bold">{title.label}</h1>
-            <p className="text-xs text-neutral-500">{title.subtitle}</p>
-          </div>
+      <NavBar />
+
+      {/* Section sub-header */}
+      <div className="border-b border-navy-border bg-navy-surface/40">
+        <div className="max-w-7xl mx-auto px-6 py-3">
+          <h2 className="font-serif text-lg font-bold">{title.label}</h2>
+          <p className="text-xs text-neutral-500">{title.subtitle}</p>
         </div>
-      </nav>
+      </div>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Search */}

@@ -133,6 +133,10 @@ export async function markPaid(jobName: string) {
   return await callMethod(`${API}.mark_paid`, { job_name: jobName });
 }
 
+export async function revertStatus(jobName: string, targetStatus: string) {
+  return await callMethod(`${API}.revert_status`, { job_name: jobName, target_status: targetStatus });
+}
+
 // ──────────────────────────────────────────────
 // Job Intake & Labor/Service Management
 // ──────────────────────────────────────────────

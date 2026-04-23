@@ -3,9 +3,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getAuth, clearAuth, getWorkflowCounts, globalSearch, type WorkflowCounts, type SearchResult } from "@/lib/frappe";
-import EventBadge from "@/app/manager/components/EventBadge";
-import EventPanel from "@/app/manager/components/EventPanel";
+import { getAuth, getWorkflowCounts, globalSearch, type WorkflowCounts, type SearchResult } from "@/lib/frappe";
+import NavBar from "@/app/manager/components/NavBar";
 
 interface PipelineCard {
   key: keyof WorkflowCounts;
@@ -63,7 +62,6 @@ export default function DashboardPage() {
     paid_today: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [eventPanelOpen, setEventPanelOpen] = useState(false);
 
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -133,120 +131,12 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, [router]);
 
-  const handleLogout = () => {
-    clearAuth();
-    router.replace("/manager");
-  };
-
   return (
     <div className="min-h-screen">
-      {/* Nav */}
-      <nav className="border-b border-navy-border bg-navy-surface/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <h1 className="text-xl font-serif font-extrabold">
-              Many<span className="text-gold-gradient">Talents</span> Manager
-            </h1>
-            <span className="text-xs text-neutral-500 uppercase tracking-wider hidden sm:inline">
-              Office Dashboard
-            </span>
-          </div>
-
-          {/* Search bar */}
-          <div ref={searchRef} className="relative flex-1 max-w-md hidden sm:block">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => handleSearch(e.target.value)}
-              onFocus={() => results.length > 0 && setSearchOpen(true)}
-              onKeyDown={(e) => e.key === "Escape" && setSearchOpen(false)}
-              placeholder="Search jobs, customers, addresses, techs..."
-              className="w-full bg-navy border border-navy-border rounded-lg px-4 py-2 text-sm text-cream placeholder-neutral-600 focus:outline-none focus:border-gold-dark transition"
-            />
-            {searching && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <div className="h-4 w-4 rounded-full border-2 border-gold-dark border-t-transparent animate-spin" />
-              </div>
-            )}
-            {searchOpen && results.length > 0 && (
-              <div className="absolute top-full mt-1 left-0 right-0 bg-navy-surface border border-navy-border rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
-                {results.map((r) => (
-                  <Link
-                    key={r.job_name}
-                    href={`/manager/jobs/${r.job_name}`}
-                    onClick={() => { setSearchOpen(false); setSearch(""); }}
-                    className="block px-4 py-3 hover:bg-navy-card/50 transition border-b border-navy-border/30 last:border-0"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-cream text-sm truncate">
-                            {r.customer_name || "Unknown"}
-                          </span>
-                          <span className="text-xs text-gold">#{r.hcp_job_id}</span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${STATUS_COLORS[r.status] || "bg-neutral-700 text-neutral-300"}`}>
-                            {r.status}
-                          </span>
-                        </div>
-                        <p className="text-xs text-neutral-500 truncate mt-0.5">
-                          {r.address}{r.town ? `, ${r.town}` : ""}
-                        </p>
-                      </div>
-                      {MATCH_LABELS[r.match_field] && (
-                        <span className="text-xs text-neutral-600 flex-shrink-0">
-                          {MATCH_LABELS[r.match_field]}
-                        </span>
-                      )}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-            {searchOpen && results.length === 0 && search.trim().length >= 2 && !searching && (
-              <div className="absolute top-full mt-1 left-0 right-0 bg-navy-surface border border-navy-border rounded-xl shadow-2xl z-50 p-4">
-                <p className="text-sm text-neutral-500 text-center">No results found</p>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-4 flex-shrink-0">
-            <Link
-              href="/manager/jobs/new"
-              className="bg-gradient-to-br from-gold to-gold-dark text-navy font-bold px-4 py-2 rounded-lg text-sm hover:from-gold-light hover:to-gold transition"
-            >
-              + New Job
-            </Link>
-            <Link href="/manager/jobs" className="text-sm text-neutral-300 hover:text-gold-light transition">
-              All Jobs
-            </Link>
-            <Link href="/manager/pricing" className="text-sm text-neutral-300 hover:text-gold-light transition">
-              Pricing
-            </Link>
-            <Link href="/manager/inventory" className="text-sm text-neutral-300 hover:text-gold-light transition">
-              Inventory
-            </Link>
-            <Link href="/manager/admin/invite" className="text-sm text-neutral-300 hover:text-gold-light transition hidden lg:inline" title="Generate magic-link login for office staff">
-              Invite
-            </Link>
-            <Link href="/manager/admin/requests" className="text-sm text-neutral-300 hover:text-gold-light transition hidden lg:inline" title="Review access requests">
-              Requests
-            </Link>
-            <Link href="/manager/admin/approvers" className="text-sm text-neutral-300 hover:text-gold-light transition hidden lg:inline" title="Manage who can approve access requests">
-              Approvers
-            </Link>
-            <EventBadge onClick={() => setEventPanelOpen(true)} />
-            <button
-              onClick={handleLogout}
-              className="text-sm text-neutral-400 hover:text-red-400 transition"
-            >
-              Log Out
-            </button>
-          </div>
-        </div>
-      </nav>
+      <NavBar />
 
       {/* Content */}
-      <main className={`max-w-7xl mx-auto px-6 py-10 transition-all duration-200 ${eventPanelOpen ? "mr-80" : ""}`}>
+      <main className="max-w-7xl mx-auto px-6 py-10">
         <div className="mb-10">
           <p className="text-xs uppercase tracking-widest text-gold mb-2">
             Office Pipeline
@@ -311,7 +201,6 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      <EventPanel isOpen={eventPanelOpen} onClose={() => setEventPanelOpen(false)} />
     </div>
   );
 }

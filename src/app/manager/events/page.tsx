@@ -13,6 +13,7 @@ import {
   EVENT_TYPE_LABELS,
   relativeTime,
 } from "@/lib/events";
+import NavBar from "@/app/manager/components/NavBar";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -204,30 +205,20 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen bg-[#080c18]">
-      {/* Nav */}
-      <nav className="bg-[#0d1120] border-b border-[#1a1f32] sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/manager/dashboard"
-              className="text-sm text-neutral-400 hover:text-[#c9a84c] transition flex items-center gap-1.5"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Dashboard
-            </Link>
-            <div className="h-4 w-px bg-[#1a1f32]" />
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-sm font-bold tracking-widest text-white uppercase">Events</h1>
-              <span className="flex items-center gap-1.5 text-[11px] text-neutral-400">
-                <span className="relative flex h-2 w-2">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${liveTail && datePreset === "live" ? "bg-green-400" : "bg-neutral-600"}`} />
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${liveTail && datePreset === "live" ? "bg-green-500" : "bg-neutral-600"}`} />
-                </span>
-                {liveTail && datePreset === "live" ? "Live" : "Paused"}
+      <NavBar />
+
+      {/* Events sub-header */}
+      <div className="bg-[#0d1120] border-b border-[#1a1f32]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-sm font-bold tracking-widest text-white uppercase">Events</h2>
+            <span className="flex items-center gap-1.5 text-[11px] text-neutral-400">
+              <span className="relative flex h-2 w-2">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${liveTail && datePreset === "live" ? "bg-green-400" : "bg-neutral-600"}`} />
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${liveTail && datePreset === "live" ? "bg-green-500" : "bg-neutral-600"}`} />
               </span>
-            </div>
+              {liveTail && datePreset === "live" ? "Live" : "Paused"}
+            </span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -248,7 +239,7 @@ export default function EventsPage() {
             </button>
           </div>
         </div>
-      </nav>
+      </div>
 
       {/* Filter bar */}
       <div className="bg-white border-b border-neutral-200 sticky top-[53px] z-10">

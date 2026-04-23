@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   getAuth,
   getDefaultLaborRate,
@@ -11,6 +10,7 @@ import {
   getCustomerHistory,
   searchAddresses,
 } from "@/lib/frappe";
+import NavBar from "@/app/manager/components/NavBar";
 
 // ── Phone formatting ──
 function formatPhone(raw: string): string {
@@ -68,7 +68,7 @@ export default function NewJobPage() {
   const [laborHours, setLaborHours] = useState("");
   const [laborRate, setLaborRate] = useState("");
   const [laborDescription, setLaborDescription] = useState("");
-  const [defaultRate, setDefaultRate] = useState(150);
+  const [defaultRate, setDefaultRate] = useState(155);
 
   // State
   const [submitting, setSubmitting] = useState(false);
@@ -213,29 +213,7 @@ export default function NewJobPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Nav */}
-      <nav className="border-b border-navy-border bg-navy-surface/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-4">
-          <Link
-            href="/manager/dashboard"
-            className="text-neutral-400 hover:text-gold-light transition"
-          >
-            ← Dashboard
-          </Link>
-          <div className="h-5 w-px bg-navy-border" />
-          <Link
-            href="/manager/jobs"
-            className="text-neutral-400 hover:text-gold-light transition text-sm"
-          >
-            All Jobs
-          </Link>
-          <div className="h-5 w-px bg-navy-border" />
-          <div>
-            <h1 className="font-serif text-lg font-bold">New Job</h1>
-            <p className="text-xs text-neutral-500">Intake form</p>
-          </div>
-        </div>
-      </nav>
+      <NavBar />
 
       <main className="max-w-3xl mx-auto px-6 py-8 space-y-6">
         {/* Customer */}

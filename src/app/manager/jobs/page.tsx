@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getAuth, getJobList } from "@/lib/frappe";
+import NavBar from "@/app/manager/components/NavBar";
 
 interface Job {
   name: string;
@@ -68,28 +69,7 @@ export default function AllJobsPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Nav */}
-      <nav className="border-b border-navy-border bg-navy-surface/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-4">
-          <Link
-            href="/manager/dashboard"
-            className="text-neutral-400 hover:text-gold-light transition"
-          >
-            ← Dashboard
-          </Link>
-          <div className="h-5 w-px bg-navy-border" />
-          <div className="flex-1">
-            <h1 className="font-serif text-lg font-bold">All Jobs</h1>
-            <p className="text-xs text-neutral-500">Every job in the system</p>
-          </div>
-          <Link
-            href="/manager/jobs/new"
-            className="bg-gradient-to-br from-gold to-gold-dark text-navy font-bold px-5 py-2.5 rounded-lg text-sm hover:from-gold-light hover:to-gold transition"
-          >
-            + New Job
-          </Link>
-        </div>
-      </nav>
+      <NavBar />
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Search + filter */}

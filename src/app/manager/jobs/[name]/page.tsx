@@ -11,9 +11,11 @@ import {
   createInvoiceForJob,
   markInvoiced,
   markPaid,
+  revertStatus,
   updateJobServices,
   getDefaultLaborRate,
 } from "@/lib/frappe";
+import NavBar from "@/app/manager/components/NavBar";
 
 const STATUS_COLORS: Record<string, string> = {
   Entered: "bg-neutral-700 text-neutral-300",
@@ -29,6 +31,13 @@ const STATUS_COLORS: Record<string, string> = {
   Canceled: "bg-red-900/60 text-red-300",
 };
 
+// Create invoice then auto-mark as Invoiced
+async function createAndMarkInvoiced(jobName: string, sendEmail: boolean) {
+  const res = await createInvoiceForJob(jobName, sendEmail);
+  await markInvoiced(jobName);
+  return res;
+}
+
 // Workflow action config per status
 const WORKFLOW_ACTIONS: Record<
   string,
@@ -37,6 +46,7 @@ const WORKFLOW_ACTIONS: Record<
     action: (jobName: string) => Promise<any>;
     color: string;
     confirm?: string;
+    secondary?: boolean;
   }>
 > = {
   Completed: [
@@ -52,19 +62,31 @@ const WORKFLOW_ACTIONS: Record<
       action: approveForInvoice,
       color: "from-blue-600 to-blue-700",
     },
+    {
+      label: "Back to Completed",
+      action: (name) => revertStatus(name, "Completed"),
+      color: "from-neutral-600 to-neutral-700",
+      secondary: true,
+    },
   ],
   Checked: [
     {
       label: "Create Invoice",
-      action: (name) => createInvoiceForJob(name, false),
+      action: (name) => createAndMarkInvoiced(name, false),
       color: "from-gold to-gold-dark",
       confirm: "Create a Sales Invoice for this job?",
     },
     {
       label: "Create & Email Invoice",
-      action: (name) => createInvoiceForJob(name, true),
+      action: (name) => createAndMarkInvoiced(name, true),
       color: "from-gold to-gold-dark",
       confirm: "Create and email the invoice to the customer?",
+    },
+    {
+      label: "Back to Needs Check",
+      action: (name) => revertStatus(name, "Needs Check"),
+      color: "from-neutral-600 to-neutral-700",
+      secondary: true,
     },
   ],
   Invoiced: [
@@ -73,6 +95,12 @@ const WORKFLOW_ACTIONS: Record<
       action: markPaid,
       color: "from-emerald-600 to-emerald-700",
       confirm: "Mark this job as paid?",
+    },
+    {
+      label: "Back to Checked",
+      action: (name) => revertStatus(name, "Checked"),
+      color: "from-neutral-600 to-neutral-700",
+      secondary: true,
     },
   ],
 };
@@ -94,7 +122,8 @@ export default function JobDetailPage() {
     Array<{ description: string; qty: string; rate: string }>
   >([]);
   const [savingServices, setSavingServices] = useState(false);
-  const [defaultRate, setDefaultRate] = useState(150);
+  const [defaultRate, setDefaultRate] = useState(155);
+  const [invoiceInfo, setInvoiceInfo] = useState<{ name: string; url: string } | null>(null);
 
   const loadJob = () => {
     setLoading(true);
@@ -181,11 +210,19 @@ export default function JobDetailPage() {
     setError("");
     try {
       const res = await action(jobName);
-      setActionResult(
-        res?.sales_invoice
-          ? `Invoice ${res.sales_invoice} created${res.emailed ? " and emailed" : ""}`
-          : `Status updated to ${res?.status || "success"}`
-      );
+      if (res?.sales_invoice) {
+        const creds = getAuth();
+        const siteUrl = creds?.siteUrl || "https://manytalentsmore.v.frappe.cloud";
+        setInvoiceInfo({
+          name: res.sales_invoice,
+          url: `${siteUrl}/app/sales-invoice/${res.sales_invoice}`,
+        });
+        setActionResult(
+          `Invoice ${res.sales_invoice} created${res.emailed ? " and emailed" : ""}`
+        );
+      } else {
+        setActionResult(`Status updated to ${res?.status || "success"}`);
+      }
       loadJob();
     } catch (err: any) {
       setError(err.message || "Action failed");
@@ -224,20 +261,15 @@ export default function JobDetailPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Nav */}
-      <nav className="border-b border-navy-border bg-navy-surface/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-4">
-          <Link
-            href="/manager/jobs"
-            className="text-neutral-400 hover:text-gold-light transition"
-          >
-            ← All Jobs
-          </Link>
-          <div className="h-5 w-px bg-navy-border" />
+      <NavBar />
+
+      {/* Job sub-header */}
+      <div className="border-b border-navy-border bg-navy-surface/40">
+        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center gap-4">
           <div className="flex-1 min-w-0">
-            <h1 className="font-serif text-lg font-bold truncate">
+            <h2 className="font-serif text-lg font-bold truncate">
               {job.customer_name || "Unknown Customer"}
-            </h1>
+            </h2>
             <p className="text-xs text-neutral-500">
               #{job.hcp_job_id} · {job.name}
             </p>
@@ -250,13 +282,23 @@ export default function JobDetailPage() {
             {job.status}
           </span>
         </div>
-      </nav>
+      </div>
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
         {/* Action result / error */}
         {actionResult && (
           <div className="bg-emerald-950/40 border border-emerald-900/60 rounded-lg px-4 py-3 text-sm text-emerald-300">
             {actionResult}
+            {invoiceInfo && (
+              <a
+                href={invoiceInfo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-3 underline text-gold hover:text-gold-light"
+              >
+                View {invoiceInfo.name} in ERPNext
+              </a>
+            )}
           </div>
         )}
         {error && (
@@ -272,7 +314,7 @@ export default function JobDetailPage() {
               Workflow Actions
             </p>
             <div className="flex flex-wrap gap-3">
-              {actions.map((a, i) => (
+              {actions.filter(a => !a.secondary).map((a, i) => (
                 <button
                   key={i}
                   onClick={() => handleAction(a.action, a.confirm)}
@@ -280,6 +322,16 @@ export default function JobDetailPage() {
                   className={`bg-gradient-to-br ${a.color} text-white font-bold px-6 py-3 rounded-lg hover:opacity-90 transition disabled:opacity-60`}
                 >
                   {acting ? "Processing..." : a.label}
+                </button>
+              ))}
+              {actions.filter(a => a.secondary).map((a, i) => (
+                <button
+                  key={`s${i}`}
+                  onClick={() => handleAction(a.action, a.confirm)}
+                  disabled={acting}
+                  className="text-sm text-neutral-500 hover:text-cream border border-navy-border px-4 py-2 rounded-lg transition disabled:opacity-60"
+                >
+                  {acting ? "..." : a.label}
                 </button>
               ))}
             </div>

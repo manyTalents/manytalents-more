@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { getAuth } from "@/lib/frappe";
+import NavBar from "@/app/manager/components/NavBar";
 import {
   fetchAllReceipts,
   fetchReceiptDetail,
@@ -2925,40 +2925,10 @@ export default function InventoryPage() {
 
   return (
     <div className="min-h-screen bg-[#080c18]">
-      {/* Nav */}
-      <nav className="bg-[#0d1120] border-b border-[#1a1f32] sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Link
-                href="/manager/dashboard"
-                className="text-sm text-neutral-400 hover:text-[#c9a84c] transition flex items-center gap-1.5"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Dashboard
-              </Link>
-            <div className="h-4 w-px bg-[#1a1f32]" />
-            <h1 className="text-sm font-bold tracking-widest text-white uppercase">Inventory</h1>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-neutral-500">
-            {summary.pending_receipts > 0 && (
-              <span className="bg-[#E67E22]/20 text-[#E67E22] px-2 py-0.5 rounded-full font-semibold">
-                {summary.pending_receipts} pending
-              </span>
-            )}
-            {summary.pending_limbo_items > 0 && (
-              <span className="bg-[#E67E22]/20 text-[#E67E22] px-2 py-0.5 rounded-full font-semibold">
-                {summary.pending_limbo_items} in limbo
-              </span>
-            )}
-          </div>
-        </div>
-      </nav>
+      <NavBar />
 
       {/* Sub-tab bar */}
-      <div className="bg-[#0d1120] border-b border-[#1a1f32] sticky top-[53px] z-10">
+      <div className="bg-[#0d1120] border-b border-[#1a1f32] sticky top-[49px] z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center gap-1">
             {TABS.map((tab) => (
