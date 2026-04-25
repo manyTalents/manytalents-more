@@ -9,6 +9,9 @@ import {
   searchCustomers,
   getCustomerHistory,
   searchAddresses,
+  listTechs,
+  assignTech,
+  type TechListItem,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 
@@ -39,6 +42,8 @@ export default function NewJobPage() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  // tracks whether the typed name matched any existing customer
+  const [customerIsNew, setCustomerIsNew] = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
@@ -55,14 +60,20 @@ export default function NewJobPage() {
   const [keycode, setKeycode] = useState("");
   const [keyAtOffice, setKeyAtOffice] = useState(false);
 
+  // Occupant
+  const [occupantName, setOccupantName] = useState("");
+  const [occupantPhone, setOccupantPhone] = useState("");
+
   // Job details
   const [description, setDescription] = useState("");
   const [selectedTrades, setSelectedTrades] = useState<Set<string>>(new Set());
   const [scheduledDate, setScheduledDate] = useState("");
   const [priority, setPriority] = useState("Normal");
   const [isEstimate, setIsEstimate] = useState(false);
-  const [occupantName, setOccupantName] = useState("");
-  const [occupantPhone, setOccupantPhone] = useState("");
+
+  // Tech assignment
+  const [techList, setTechList] = useState<TechListItem[]>([]);
+  const [selectedTechs, setSelectedTechs] = useState<Set<string>>(new Set());
 
   // Labor
   const [laborHours, setLaborHours] = useState("");
@@ -85,12 +96,16 @@ export default function NewJobPage() {
         setLaborRate(String(res.rate));
       })
       .catch(() => {});
+    listTechs()
+      .then((list) => setTechList(list || []))
+      .catch(() => {});
   }, [router]);
 
   // ── Customer search ──
   const handleCustomerSearch = (value: string) => {
     setCustomerName(value);
     setHistoryLoaded(false);
+    setCustomerIsNew(false);
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     if (value.length < 2) {
       setSuggestions([]);
@@ -101,9 +116,11 @@ export default function NewJobPage() {
       try {
         const results = await searchCustomers(value);
         setSuggestions(results || []);
-        setShowSuggestions(results.length > 0);
+        setShowSuggestions(true); // always show dropdown once we have a result (even empty for "create new")
+        setCustomerIsNew(results.length === 0);
       } catch {
         setSuggestions([]);
+        setCustomerIsNew(false);
       }
     }, 300);
   };
@@ -112,6 +129,7 @@ export default function NewJobPage() {
     setCustomerName(cust.customer_name);
     setShowSuggestions(false);
     setSuggestions([]);
+    setCustomerIsNew(false);
     // Autofill from history
     try {
       const history = await getCustomerHistory(cust.customer_name);
@@ -124,6 +142,12 @@ export default function NewJobPage() {
         setHistoryLoaded(true);
       }
     } catch {}
+  };
+
+  const confirmNewCustomer = () => {
+    // User explicitly confirms they want to create a new customer record
+    setShowSuggestions(false);
+    setCustomerIsNew(false); // badge stays off once confirmed
   };
 
   // ── Address search ──
@@ -173,6 +197,14 @@ export default function NewJobPage() {
     setSelectedTrades(next);
   };
 
+  // ── Tech toggle ──
+  const toggleTech = (email: string) => {
+    const next = new Set(selectedTechs);
+    if (next.has(email)) next.delete(email);
+    else next.add(email);
+    setSelectedTechs(next);
+  };
+
   // ── Submit ──
   const handleSubmit = async () => {
     setError("");
@@ -188,6 +220,8 @@ export default function NewJobPage() {
         town: town.trim(),
         customer_phone: customerPhone.replace(/\D/g, ""),
         description: description.trim(),
+        // Passing empty string keeps it as "unscheduled" intent;
+        // backend currently defaults to now() if blank — tracked for backend fix.
         scheduled_date: scheduledDate || undefined,
         job_type: Array.from(selectedTrades).join(", "),
         priority,
@@ -200,6 +234,15 @@ export default function NewJobPage() {
         labor_rate: parseFloat(laborRate) || 0,
         labor_description: laborDescription.trim(),
       });
+
+      // Assign selected techs post-creation (backend assign_tech endpoint)
+      if (selectedTechs.size > 0) {
+        const assignments = Array.from(selectedTechs).map((email) =>
+          assignTech(result.name, email, "Lead Tech").catch(() => {})
+        );
+        await Promise.all(assignments);
+      }
+
       router.push(`/manager/jobs/${result.name}`);
     } catch (err: any) {
       setError(err.message || "Could not create job");
@@ -231,7 +274,8 @@ export default function NewJobPage() {
                 value={customerName}
                 onChange={(e) => handleCustomerSearch(e.target.value)}
                 onFocus={() =>
-                  suggestions.length > 0 && setShowSuggestions(true)
+                  (suggestions.length > 0 || customerIsNew) &&
+                  setShowSuggestions(true)
                 }
                 onBlur={() =>
                   setTimeout(() => setShowSuggestions(false), 200)
@@ -251,11 +295,28 @@ export default function NewJobPage() {
                       {c.customer_name}
                     </button>
                   ))}
+                  {/* Explicit "Create New" option when no matches */}
+                  {customerIsNew && customerName.trim().length >= 2 && (
+                    <button
+                      type="button"
+                      onMouseDown={confirmNewCustomer}
+                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-gold hover:bg-navy transition flex items-center gap-2"
+                    >
+                      <span className="text-base leading-none">+</span>
+                      Create new customer &ldquo;{customerName.trim()}&rdquo;
+                    </button>
+                  )}
                 </div>
               )}
               {historyLoaded && (
                 <p className="text-xs text-emerald-500 mt-1">
                   Auto-filled from history
+                </p>
+              )}
+              {/* Badge shown after search resolves with no match and dropdown closed */}
+              {!showSuggestions && customerIsNew && customerName.trim().length >= 2 && (
+                <p className="text-xs text-amber-400 mt-1">
+                  New customer — will be created on submit
                 </p>
               )}
             </div>
@@ -332,6 +393,7 @@ export default function NewJobPage() {
                 className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
               />
             </div>
+            {/* Occupant / Tenant — co-located in Location section */}
             <div>
               <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">
                 Occupant / Tenant Name
@@ -341,6 +403,20 @@ export default function NewJobPage() {
                 value={occupantName}
                 onChange={(e) => setOccupantName(e.target.value)}
                 placeholder="If different from customer"
+                className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">
+                Occupant / Tenant Phone
+              </label>
+              <input
+                type="tel"
+                value={occupantPhone}
+                onChange={(e) =>
+                  handlePhoneChange(e.target.value, setOccupantPhone)
+                }
+                placeholder="(555) 123-4567"
                 className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
               />
             </div>
@@ -409,22 +485,6 @@ export default function NewJobPage() {
               />
             </div>
 
-            {/* Occupant phone — moved here per request */}
-            <div className="sm:w-1/2">
-              <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">
-                Occupant / Tenant Phone
-              </label>
-              <input
-                type="tel"
-                value={occupantPhone}
-                onChange={(e) =>
-                  handlePhoneChange(e.target.value, setOccupantPhone)
-                }
-                placeholder="(555) 123-4567"
-                className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
-              />
-            </div>
-
             {/* Trade checkboxes */}
             <div>
               <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-2">
@@ -465,6 +525,9 @@ export default function NewJobPage() {
                   onChange={(e) => setScheduledDate(e.target.value)}
                   className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
                 />
+                <p className="text-xs text-neutral-600 mt-1">
+                  Leave blank for unscheduled (white card)
+                </p>
               </div>
               <div>
                 <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">
@@ -473,13 +536,22 @@ export default function NewJobPage() {
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
-                  className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
+                  className={`w-full bg-navy border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition ${
+                    priority === "Urgent"
+                      ? "border-red-600 bg-red-950/30"
+                      : "border-navy-border"
+                  }`}
                 >
                   <option value="Low">Low</option>
                   <option value="Normal">Normal</option>
                   <option value="High">High</option>
                   <option value="Urgent">Urgent</option>
                 </select>
+                {priority === "Urgent" && (
+                  <p className="text-xs text-red-400 mt-1">
+                    Job card will be highlighted red
+                  </p>
+                )}
               </div>
             </div>
 
@@ -496,6 +568,42 @@ export default function NewJobPage() {
             </label>
           </div>
         </div>
+
+        {/* Tech Assignment */}
+        {techList.length > 0 && (
+          <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+            <p className="text-xs uppercase tracking-wider text-neutral-400 mb-4">
+              Assign Techs
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {techList.map((tech) => {
+                const selected = selectedTechs.has(tech.email);
+                return (
+                  <button
+                    key={tech.email}
+                    type="button"
+                    onClick={() => toggleTech(tech.email)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium border transition select-none ${
+                      selected
+                        ? "bg-gold-dark/20 border-gold-dark text-gold"
+                        : "bg-navy border-navy-border text-neutral-400 hover:border-neutral-500 hover:text-cream"
+                    }`}
+                  >
+                    {tech.name}
+                    {selected && (
+                      <span className="ml-1.5 text-xs opacity-70">assigned</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedTechs.size > 0 && (
+              <p className="text-xs text-neutral-500 mt-3">
+                {selectedTechs.size} tech{selectedTechs.size > 1 ? "s" : ""} will be assigned after the job is created
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Labor */}
         <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">

@@ -367,6 +367,19 @@ export async function listTechs(): Promise<TechListItem[]> {
   return await callMethod<TechListItem[]>(`${AUTH_API}.list_techs`);
 }
 
+/** Assign a tech (by user email) to an existing job. */
+export async function assignTech(
+  jobName: string,
+  techUser: string,
+  role: "Lead Tech" | "Helper" = "Lead Tech"
+): Promise<{ status: string }> {
+  return await callMethod(`${API}.assign_tech`, {
+    job_name: jobName,
+    tech_user: techUser,
+    role,
+  });
+}
+
 // ──────────────────────────────────────────────
 // Access Approvers management
 // ──────────────────────────────────────────────
