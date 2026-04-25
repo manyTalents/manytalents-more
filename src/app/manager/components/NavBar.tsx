@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: "/manager/jobs", label: "All Jobs" },
   { href: "/manager/pricing", label: "Pricing" },
   { href: "/manager/invoices", label: "Invoices" },
+  { href: "/manager/customers", label: "Customers" },
   { href: "/manager/inventory", label: "Inventory" },
   { href: "/manager/admin/techs", label: "Team" },
 ] as const;
