@@ -579,3 +579,77 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
   if (!query || query.trim().length < 2) return [];
   return await callMethod<SearchResult[]>(`${API}.global_search`, { query: query.trim() });
 }
+
+// ── Dashboard Stats ──────────────────────────────────────
+
+const DASHBOARD_API = "hcp_replacement.hcp_replacement.api.dashboard_stats";
+
+export async function getJobStats(weeks = 10) {
+  return callMethod<{
+    weeks: { label: string; revenue: number; count: number; avg: number }[];
+    totals: { revenue: number; count: number; avg: number };
+  }>(`${DASHBOARD_API}.get_job_stats`, { weeks });
+}
+
+export async function getTeamStats(period = "weekly") {
+  return callMethod<{
+    techs: { name: string; initials: string; revenue: number; job_count: number; hours_clocked: number; hours_billable: number }[];
+    period: { start: string; end: string };
+  }>(`${DASHBOARD_API}.get_team_stats`, { period });
+}
+
+export async function getRecentJobImages(limit = 20) {
+  return callMethod<{
+    images: { url: string; job_name: string; job_id: string; uploaded_at: string }[];
+  }>(`${DASHBOARD_API}.get_recent_job_images`, { limit });
+}
+
+export async function getJobsNeedingEstimate() {
+  return callMethod<{
+    jobs: { name: string; hcp_job_id: string; customer_name: string; address: string; status: string; modified: string }[];
+    count: number;
+  }>(`${DASHBOARD_API}.get_jobs_needing_estimate`);
+}
+
+// ── A/R Aging ────────────────────────────────────────────
+
+const AR_API = "hcp_replacement.hcp_replacement.api.ar_aging";
+
+export interface ARInvoice {
+  name: string;
+  customer: string;
+  amount: number;
+  days: number;
+  status: string;
+  last_resend: string;
+  resend_count: number;
+  colour: string;
+}
+
+export interface ARBucket {
+  label: string;
+  count: number;
+  total: number;
+  invoices: ARInvoice[];
+}
+
+export async function getARAging() {
+  return callMethod<{
+    buckets: ARBucket[];
+    summary: { total_outstanding: number; total_count: number };
+  }>(`${AR_API}.get_ar_aging`);
+}
+
+export async function sendInvoice(invoiceName: string, sendEmail = true) {
+  return callMethod<{ status: string; sent_at: string }>(
+    `${AR_API}.send_invoice`,
+    { invoice_name: invoiceName, send_email: sendEmail ? 1 : 0 }
+  );
+}
+
+export async function resendInvoice(invoiceName: string) {
+  return callMethod<{ status: string; resend_count: number; resent_at: string }>(
+    `${AR_API}.resend_invoice`,
+    { invoice_name: invoiceName }
+  );
+}
