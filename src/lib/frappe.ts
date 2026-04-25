@@ -653,3 +653,70 @@ export async function resendInvoice(invoiceName: string) {
     { invoice_name: invoiceName }
   );
 }
+
+// ── Customers ─────────────────────────────────────────────
+
+const CUSTOMERS_API = "hcp_replacement.hcp_replacement.api.customers";
+
+export interface CustomerListItem {
+  name: string;
+  customer_name: string;
+  phone: string;
+  address_count: number;
+  total_owed: number;
+  lifetime_value: number;
+  last_job_date: string;
+  job_count: number;
+}
+
+export interface CustomerListResponse {
+  customers: CustomerListItem[];
+  total_count: number;
+  has_more: boolean;
+}
+
+export async function getCustomerList(
+  query = "",
+  page = 1,
+  pageSize = 30
+): Promise<CustomerListResponse> {
+  return callMethod<CustomerListResponse>(`${CUSTOMERS_API}.get_customer_list`, {
+    query,
+    page,
+    page_size: pageSize,
+  });
+}
+
+export interface CustomerAddress {
+  name: string;
+  address_line1: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
+
+export interface CustomerJob {
+  name: string;
+  hcp_job_id: string;
+  address: string;
+  status: string;
+  total_job_cost: number;
+  modified: string;
+}
+
+export interface CustomerProfile {
+  name: string;
+  customer_name: string;
+  phone: string;
+  email: string;
+  creation: string;
+  addresses: CustomerAddress[];
+  jobs: CustomerJob[];
+  total_owed: number;
+  lifetime_value: number;
+  upcoming_jobs: { name: string; hcp_job_id: string; address: string; status: string }[];
+}
+
+export async function getCustomerProfile(customer: string): Promise<CustomerProfile> {
+  return callMethod<CustomerProfile>(`${CUSTOMERS_API}.get_customer_profile`, { customer });
+}
