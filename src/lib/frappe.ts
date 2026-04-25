@@ -892,3 +892,17 @@ export async function generateWorkOrder(planName: string) {
     { plan_name: planName }
   );
 }
+
+export async function getPlansDue(daysAhead = 14) {
+  return callMethod<{
+    plans: {
+      name: string;
+      template_name: string;
+      customer_name: string;
+      address: string;
+      next_service_date: string;
+      days_until: number;
+    }[];
+    count: number;
+  }>(`${PLANS_API}.get_plans_due`, { days_ahead: daysAhead });
+}
