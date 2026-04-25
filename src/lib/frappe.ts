@@ -799,3 +799,83 @@ export async function approveEstimateOption(token: string, optionIdx: number, ac
 export async function expireEstimate(estimateName: string) {
   return callMethod<{ status: string }>(`${ESTIMATES_API}.expire_estimate`, { estimate_name: estimateName });
 }
+
+// ── Service Plans ─────────────────────────────────────────
+
+const PLANS_API = "hcp_replacement.hcp_replacement.api.service_plans";
+
+export interface PlanTemplate {
+  name: string;
+  name_label: string;
+  trade: string;
+  price: number;
+  service_interval_months: number;
+  visits_per_year: number;
+  billing_cadence: string;
+}
+
+export interface PlanInstance {
+  name: string;
+  template_name: string;
+  customer_name: string;
+  address: string;
+  status: string;
+  price: number;
+  next_service_date: string;
+}
+
+export interface PlanDetail {
+  name: string;
+  template: string;
+  template_name: string;
+  customer: string;
+  customer_name: string;
+  address: string;
+  status: string;
+  price: number;
+  next_service_date: string;
+  last_service_date: string;
+  approved_at: string | null;
+  checklist: { item_text: string; required: number }[];
+  trade: string;
+  service_interval_months: number;
+  visits_per_year: number;
+}
+
+export async function getPlanTemplates() {
+  return callMethod<{ templates: PlanTemplate[] }>(`${PLANS_API}.get_plan_templates`);
+}
+
+export async function getPlansList(statusFilter = "all", page = 1, pageSize = 30) {
+  return callMethod<{ plans: PlanInstance[]; total_count: number; has_more: boolean }>(
+    `${PLANS_API}.get_plans_list`,
+    { status_filter: statusFilter, page, page_size: pageSize }
+  );
+}
+
+export async function getPlanDetail(planName: string) {
+  return callMethod<PlanDetail>(`${PLANS_API}.get_plan_detail`, { plan_name: planName });
+}
+
+export async function createPlanInstance(template: string, customer: string, address: string) {
+  return callMethod<{ name: string }>(`${PLANS_API}.create_plan_instance`, { template, customer, address });
+}
+
+export async function sendPlan(planName: string) {
+  return callMethod<{ status: string; email_sent: boolean }>(`${PLANS_API}.send_plan`, { plan_name: planName });
+}
+
+export async function approvePlan(token: string) {
+  return callGuestMethod<{ status: string }>(`${PLANS_API}.approve_plan`, { token });
+}
+
+export async function getPlanByToken(token: string) {
+  return callGuestMethod<any>(`${PLANS_API}.get_plan_by_token`, { token });
+}
+
+export async function generateWorkOrder(planName: string) {
+  return callMethod<{ job_name: string; hcp_job_id: string }>(
+    `${PLANS_API}.generate_work_order`,
+    { plan_name: planName }
+  );
+}
