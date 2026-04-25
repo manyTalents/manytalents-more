@@ -11,6 +11,8 @@ import JobCountWidget from "./widgets/JobCountWidget";
 import TeamLeaderboardWidget from "./widgets/TeamLeaderboardWidget";
 import NeedsCheckWidget from "./widgets/NeedsCheckWidget";
 import NeedEstimateWidget from "./widgets/NeedEstimateWidget";
+import ServicePlansDueWidget from "./widgets/ServicePlansDueWidget";
+import JobsImagesWidget from "./widgets/JobsImagesWidget";
 
 interface PipelineCard {
   key: keyof WorkflowCounts;
@@ -200,6 +202,10 @@ export default function DashboardPage() {
           <JobCountWidget />
           <NeedsCheckWidget />
           <NeedEstimateWidget />
+          <ServicePlansDueWidget />
+          <div className="lg:col-span-2">
+            <JobsImagesWidget />
+          </div>
         </div>
       </main>
 
