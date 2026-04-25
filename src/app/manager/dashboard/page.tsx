@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getAuth, getWorkflowCounts, globalSearch, type WorkflowCounts, type SearchResult } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
+import ARAgingWidget from "./widgets/ARAgingWidget";
+import JobRevenueWidget from "./widgets/JobRevenueWidget";
+import JobCountWidget from "./widgets/JobCountWidget";
+import TeamLeaderboardWidget from "./widgets/TeamLeaderboardWidget";
+import NeedsCheckWidget from "./widgets/NeedsCheckWidget";
+import NeedEstimateWidget from "./widgets/NeedEstimateWidget";
 
 interface PipelineCard {
   key: keyof WorkflowCounts;
@@ -184,20 +190,16 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {/* Placeholder for future widgets */}
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
-            <h3 className="text-lg font-serif font-bold mb-2">Today&apos;s Activity</h3>
-            <p className="text-sm text-neutral-500">
-              Coming soon — tech activity, receipts processed, jobs dispatched.
-            </p>
+        {/* Dashboard Widgets */}
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="lg:col-span-2">
+            <ARAgingWidget />
           </div>
-          <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
-            <h3 className="text-lg font-serif font-bold mb-2">Inventory Alerts</h3>
-            <p className="text-sm text-neutral-500">
-              Coming soon — low stock, restock requests, limbo items.
-            </p>
-          </div>
+          <JobRevenueWidget />
+          <TeamLeaderboardWidget />
+          <JobCountWidget />
+          <NeedsCheckWidget />
+          <NeedEstimateWidget />
         </div>
       </main>
 
