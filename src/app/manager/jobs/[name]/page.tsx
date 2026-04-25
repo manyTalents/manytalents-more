@@ -14,6 +14,8 @@ import {
   revertWithNote,
   updateJobServices,
   getDefaultLaborRate,
+  getEstimateList,
+  type EstimateSummary,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 
@@ -128,6 +130,10 @@ export default function JobDetailPage() {
   const [defaultRate, setDefaultRate] = useState(155);
   const [invoiceInfo, setInvoiceInfo] = useState<{ name: string; url: string } | null>(null);
 
+  // Linked estimates
+  const [estimates, setEstimates] = useState<EstimateSummary[]>([]);
+  const [estimatesLoading, setEstimatesLoading] = useState(true);
+
   // Send-back modal
   const [sendBackTarget, setSendBackTarget] = useState<string | null>(null);
   const [sendBackNote, setSendBackNote] = useState("");
@@ -149,6 +155,15 @@ export default function JobDetailPage() {
     getDefaultLaborRate()
       .then((res) => setDefaultRate(res.rate))
       .catch(() => {});
+    getEstimateList("all", 1, 50)
+      .then((res) => {
+        const linked = (res.estimates ?? []).filter(
+          (e) => e.linked_job === jobName
+        );
+        setEstimates(linked);
+      })
+      .catch(() => {})
+      .finally(() => setEstimatesLoading(false));
   }, [jobName, router]);
 
   const startEditingServices = () => {
@@ -699,6 +714,67 @@ export default function JobDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Estimates */}
+        <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs uppercase tracking-wider text-neutral-400">
+              Estimates
+            </p>
+            <button
+              onClick={() => router.push(`/manager/estimates/new?job=${job.name}`)}
+              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-gold/20 text-gold hover:bg-gold/30 transition"
+            >
+              + Create Estimate
+            </button>
+          </div>
+          {estimatesLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="w-5 h-5 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+            </div>
+          ) : estimates.length === 0 ? (
+            <p className="text-neutral-500 text-sm">No estimates linked to this job.</p>
+          ) : (
+            <ul className="divide-y divide-navy-border">
+              {estimates.map((est) => (
+                <li key={est.name}>
+                  <button
+                    onClick={() => router.push(`/manager/estimates/${est.name}`)}
+                    className="w-full flex items-center justify-between gap-3 py-2.5 text-left hover:bg-navy/50 transition-colors rounded px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                    aria-label={`Estimate ${est.estimate_number}`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-sm font-mono text-cream/70 flex-shrink-0">
+                        #{est.estimate_number}
+                      </span>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                          est.status === "Approved"
+                            ? "bg-emerald-900/60 text-emerald-300"
+                            : est.status === "Sent"
+                            ? "bg-blue-900/60 text-blue-300"
+                            : est.status === "Declined"
+                            ? "bg-red-900/60 text-red-300"
+                            : est.status === "Expired"
+                            ? "bg-neutral-700 text-neutral-400"
+                            : "bg-amber-900/60 text-amber-300"
+                        }`}
+                      >
+                        {est.status}
+                      </span>
+                    </div>
+                    <span className="text-sm font-medium text-gold flex-shrink-0">
+                      ${(est.total || 0).toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {/* Receipts */}
         {job.receipts && job.receipts.length > 0 && (
