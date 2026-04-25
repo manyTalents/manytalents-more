@@ -720,3 +720,82 @@ export interface CustomerProfile {
 export async function getCustomerProfile(customer: string): Promise<CustomerProfile> {
   return callMethod<CustomerProfile>(`${CUSTOMERS_API}.get_customer_profile`, { customer });
 }
+
+// ── Estimates ─────────────────────────────────────────────
+
+const ESTIMATES_API = "hcp_replacement.hcp_replacement.api.estimates";
+
+export interface EstimateLineItem {
+  description: string;
+  qty: number;
+  rate: number;
+  amount: number;
+}
+
+export interface EstimateOption {
+  name: string;
+  option_index: number;
+  name_label: string;
+  description: string;
+  total_price: number;
+  status: string;
+  financing_available: number;
+  line_items: EstimateLineItem[];
+}
+
+export interface EstimateSummary {
+  name: string;
+  estimate_number: string;
+  customer: string;
+  customer_name: string;
+  status: string;
+  linked_job: string;
+  total: number;
+  created: string;
+}
+
+export interface EstimateDetail {
+  name: string;
+  estimate_number: string;
+  customer: string;
+  customer_name: string;
+  address: string;
+  linked_job: string;
+  linked_job_id: string;
+  status: string;
+  approval_mode: string;
+  sent_at: string | null;
+  notes: string;
+  options: EstimateOption[];
+}
+
+export async function getEstimateList(statusFilter = "all", page = 1, pageSize = 30) {
+  return callMethod<{ estimates: EstimateSummary[]; total_count: number; has_more: boolean }>(
+    `${ESTIMATES_API}.get_estimate_list`, { status_filter: statusFilter, page, page_size: pageSize }
+  );
+}
+
+export async function getEstimateDetail(estimateName: string) {
+  return callMethod<EstimateDetail>(`${ESTIMATES_API}.get_estimate_detail`, { estimate_name: estimateName });
+}
+
+export async function createEstimate(params: {
+  customer: string; address: string; linked_job?: string;
+  options_json: string; approval_mode?: string; notes?: string;
+}) {
+  return callMethod<{ name: string; estimate_number: string }>(`${ESTIMATES_API}.create_estimate`, params);
+}
+
+export async function sendEstimate(estimateName: string) {
+  return callMethod<{ status: string; email_sent: boolean }>(`${ESTIMATES_API}.send_estimate`, { estimate_name: estimateName });
+}
+
+export async function approveEstimateOption(token: string, optionIdx: number, action: "approve" | "decline") {
+  return callGuestMethod<{ status: string; estimate_status: string; option_status: string }>(
+    `${ESTIMATES_API}.approve_estimate_option`, { token, option_idx: optionIdx, action }
+  );
+}
+
+export async function expireEstimate(estimateName: string) {
+  return callMethod<{ status: string }>(`${ESTIMATES_API}.expire_estimate`, { estimate_name: estimateName });
+}
