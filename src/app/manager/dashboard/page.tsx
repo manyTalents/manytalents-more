@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getAuth, getWorkflowCounts, globalSearch, type WorkflowCounts, type SearchResult } from "@/lib/frappe";
+import { getAuth, getWorkflowCounts, callMethod, globalSearch, type WorkflowCounts, type SearchResult } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 import ARAgingWidget from "./widgets/ARAgingWidget";
 import JobRevenueWidget from "./widgets/JobRevenueWidget";
@@ -23,6 +23,13 @@ interface PipelineCard {
 }
 
 const PIPELINE: PipelineCard[] = [
+  {
+    key: "finished",
+    label: "Finished",
+    description: "Tech completed, not yet reviewed",
+    color: "from-orange-500 to-orange-600",
+    href: "/manager/section/finished",
+  },
   {
     key: "needs_checked",
     label: "Needs Checked",
@@ -127,8 +134,22 @@ export default function DashboardPage() {
       router.replace("/manager");
       return;
     }
-    getWorkflowCounts()
-      .then(setCounts)
+    // Load pipeline counts
+    const cutoff = new Date();
+    cutoff.setFullYear(cutoff.getFullYear() - 1);
+    const cutoffStr = cutoff.toISOString().split("T")[0];
+
+    Promise.all([
+      getWorkflowCounts(),
+      // Override "finished" with Completed jobs from last year only (built-in Frappe method)
+      callMethod<number>("frappe.client.get_count", {
+        doctype: "HCP Job",
+        filters: { status: "Completed", modified: [">", cutoffStr] },
+      }),
+    ])
+      .then(([wf, recentFinished]) => {
+        setCounts({ ...wf, finished: recentFinished || 0 });
+      })
       .catch((err) => {
         console.warn("Failed to load counts:", err);
         setCountError(true);
