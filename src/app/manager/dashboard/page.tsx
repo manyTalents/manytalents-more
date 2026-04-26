@@ -135,16 +135,16 @@ export default function DashboardPage() {
       return;
     }
     // Load pipeline counts
+    // Use scheduled_date (not modified — HCP sync refreshes modified on all jobs)
     const cutoff = new Date();
     cutoff.setFullYear(cutoff.getFullYear() - 1);
     const cutoffStr = cutoff.toISOString().split("T")[0];
 
     Promise.all([
       getWorkflowCounts(),
-      // Override "finished" with Completed jobs from last year only (built-in Frappe method)
       callMethod<number>("frappe.client.get_count", {
         doctype: "HCP Job",
-        filters: { status: "Completed", modified: [">", cutoffStr] },
+        filters: { status: "Completed", scheduled_date: [">", cutoffStr] },
       }),
     ])
       .then(([wf, recentFinished]) => {
