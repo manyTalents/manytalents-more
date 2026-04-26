@@ -10,6 +10,13 @@ const MONEY_API = process.env.NEXT_PUBLIC_MONEY_API || 'https://money-api.manyta
 const OPTIONS_API_KEY = process.env.OPTIONS_API_KEY || ''
 
 export async function POST(req: NextRequest) {
+  // Auth check — require admin token or subscriber email
+  const adminToken = req.headers.get('x-admin-token')
+  const subEmail = req.headers.get('x-sub-email')
+  if (adminToken !== process.env.OPTIONS_ADMIN_PASSWORD && !subEmail) {
+    return NextResponse.json({ detail: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const body = await req.json().catch(() => ({}))
 

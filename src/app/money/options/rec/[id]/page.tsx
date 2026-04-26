@@ -29,7 +29,7 @@ export default async function RationalePage({ params }: Props) {
 
   const { data: rec } = await supabase
     .from("recommendations")
-    .select("*")
+    .select("id, ticker, direction, confidence, rationale, reasons, kill_conditions, rank, run_id, created_at")
     .eq("id", id)
     .single()
 
@@ -125,7 +125,7 @@ export default async function RationalePage({ params }: Props) {
           </section>
         )}
 
-        {/* Gated section — trade details */}
+        {/* Gated section — trade details (data NOT rendered, requires purchase) */}
         <section className="rounded-xl border border-navy-border p-6 bg-navy-card/30 mb-8">
           <h2 className="text-sm font-bold text-cream uppercase tracking-wide mb-3">
             Trade Details
@@ -133,27 +133,19 @@ export default async function RationalePage({ params }: Props) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-neutral-400">Structure</span>
-              <span className="text-cream blur-[6px] select-none">
-                {rec.structure_description}
-              </span>
+              <span className="text-neutral-500 italic">Locked</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-neutral-400">Strikes</span>
-              <span className="text-cream blur-[6px] select-none">
-                ${rec.buy_strike} / ${rec.sell_strike}
-              </span>
+              <span className="text-neutral-500 italic">Locked</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-neutral-400">Expiry</span>
-              <span className="text-cream blur-[6px] select-none">
-                {rec.expiry}
-              </span>
+              <span className="text-neutral-500 italic">Locked</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-neutral-400">Cost</span>
-              <span className="text-cream blur-[6px] select-none">
-                ${rec.cost_per_contract}
-              </span>
+              <span className="text-neutral-500 italic">Locked</span>
             </div>
           </div>
           <a

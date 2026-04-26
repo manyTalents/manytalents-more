@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { getAuth } from "@/lib/frappe";
 import {
   type MTMEvent,
   type EventCategory,
@@ -90,6 +92,15 @@ function groupEvents(
 const PAGE_SIZE = 50;
 
 export default function EventsPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!getAuth()) {
+      router.replace("/manager");
+      return;
+    }
+  }, [router]);
+
   // Filters
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [datePreset, setDatePreset] = useState<DatePreset>("live");

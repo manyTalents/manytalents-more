@@ -48,21 +48,33 @@ export async function GET(req: NextRequest) {
       const today = new Date().toISOString().split('T')[0]
       const runsToday = sub.last_run_date === today ? sub.runs_today : 0
 
-      if (runsToday < 5) {
-        tier = 10
-        await supabase
-          .from('subscribers')
-          .update({
-            runs_today: runsToday + 1,
-            last_run_date: today,
-          })
-          .eq('email', subEmail)
-      } else {
+      if (runsToday >= 5) {
         return NextResponse.json(
           { detail: 'Daily run limit reached (5/5). Resets at midnight ET.' },
           { status: 429 }
         )
       }
+
+      // Atomic increment — prevents race condition on concurrent requests
+      const { data: updated, error: updateErr } = await supabase
+        .from('subscribers')
+        .update({
+          runs_today: runsToday + 1,
+          last_run_date: today,
+        })
+        .eq('email', subEmail)
+        .eq('runs_today', runsToday)  // optimistic lock: only succeeds if count unchanged
+        .select('runs_today')
+        .single()
+
+      if (updateErr || !updated) {
+        return NextResponse.json(
+          { detail: 'Concurrent request — please retry.' },
+          { status: 409 }
+        )
+      }
+
+      tier = 10
     }
   }
   // One-time purchase via Stripe session

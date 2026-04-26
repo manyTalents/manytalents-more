@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 
 /**
  * POST /api/money/verify
@@ -22,7 +23,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (password !== expected) {
+    // Timing-safe comparison to prevent timing oracle attacks
+    const a = Buffer.from(password || "");
+    const b = Buffer.from(expected);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
       return NextResponse.json({ error: "Invalid password" }, { status: 401 });
     }
 
