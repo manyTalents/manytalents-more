@@ -16,6 +16,7 @@ function InvoicesInner() {
   const [filter, setFilter] = useState(initialBucket);
   const [loading, setLoading] = useState(true);
   const [resending, setResending] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const auth = getAuth();
@@ -37,7 +38,7 @@ function InvoicesInner() {
       const fresh = await getARAging();
       setBuckets(fresh.buckets);
     } catch {
-      alert("Resend failed");
+      setError("Resend failed. Please try again.");
     }
     setResending(null);
   };
@@ -61,6 +62,13 @@ function InvoicesInner() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-serif font-bold text-cream">Invoices</h1>
       </div>
+
+      {error && (
+        <div className="bg-red-950/40 border border-red-900/60 rounded-lg px-4 py-3 text-sm text-red-300 mb-6 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError("")} className="text-red-300 hover:text-red-100 ml-4 text-lg leading-none">&times;</button>
+        </div>
+      )}
 
       {/* Filter chips */}
       <div className="flex gap-2 mb-6 flex-wrap">

@@ -102,6 +102,12 @@ export default function AllJobsPage() {
         </p>
 
         {/* Job list */}
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+            <span className="ml-3 text-neutral-400 text-sm">Loading jobs...</span>
+          </div>
+        )}
         <div className="space-y-3">
           {filteredJobs.map((job) => (
             <Link

@@ -21,6 +21,9 @@ export default function WidgetShell({
     <div
       className={`bg-navy-surface border border-navy-border rounded-xl overflow-hidden ${className}`}
       onClick={onDrill}
+      role={onDrill ? "button" : undefined}
+      tabIndex={onDrill ? 0 : undefined}
+      onKeyDown={onDrill ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onDrill(); } } : undefined}
       style={onDrill ? { cursor: "pointer" } : undefined}
     >
       <div className="px-4 py-3 border-b border-navy-border flex items-center justify-between">

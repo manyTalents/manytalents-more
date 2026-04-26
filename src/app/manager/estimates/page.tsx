@@ -112,7 +112,8 @@ export default function EstimatesPage() {
             <button
               key={f}
               onClick={() => setStatusFilter(f)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
+              disabled={loading}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
                 statusFilter === f
                   ? "bg-gold-dark/30 text-gold border border-gold-dark/60"
                   : "bg-navy-surface border border-navy-border text-neutral-400 hover:text-cream hover:border-neutral-600"

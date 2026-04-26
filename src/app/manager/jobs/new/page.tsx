@@ -138,11 +138,12 @@ function NewJobInner() {
       try {
         const results = await searchCustomers(value);
         setSuggestions(results || []);
-        setShowSuggestions(true); // always show dropdown once we have a result (even empty for "create new")
+        setShowSuggestions(true);
         setCustomerIsNew(results.length === 0);
       } catch {
         setSuggestions([]);
         setCustomerIsNew(false);
+        setError("Customer search failed. Try again.");
       }
     }, 300);
   };
@@ -355,6 +356,7 @@ function NewJobInner() {
                 placeholder="(555) 123-4567"
                 className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
               />
+              <p className="text-xs text-neutral-600 mt-1">Format: (xxx) xxx-xxxx</p>
             </div>
           </div>
         </div>

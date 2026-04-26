@@ -231,6 +231,9 @@ export default function CustomerProfilePage() {
                     <tr
                       key={job.name}
                       onClick={() => router.push(`/manager/jobs/${job.name}`)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); router.push(`/manager/jobs/${job.name}`); } }}
+                      role="link"
+                      tabIndex={0}
                       className="border-b border-navy-border/50 hover:bg-navy-card/50 transition cursor-pointer"
                     >
                       <td className="py-3 pr-4">

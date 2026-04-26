@@ -152,7 +152,7 @@ function NewPlanModal({
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative bg-navy-surface border border-navy-border rounded-2xl shadow-2xl w-full max-w-lg">
+      <div role="dialog" aria-modal="true" className="relative bg-navy-surface border border-navy-border rounded-2xl shadow-2xl w-full max-w-lg">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-navy-border">
           <h2 className="text-lg font-serif font-bold text-cream">New Service Plan</h2>
@@ -174,6 +174,7 @@ function NewPlanModal({
               Plan Template
             </label>
             <select
+              autoFocus
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
               className="w-full bg-navy border border-navy-border rounded-xl px-4 py-2.5 text-sm text-cream focus:outline-none focus:border-gold-dark transition"

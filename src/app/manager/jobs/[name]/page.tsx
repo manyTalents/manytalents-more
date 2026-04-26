@@ -373,6 +373,7 @@ export default function JobDetailPage() {
                   key={`s${i}`}
                   onClick={() => {
                     if (a.sendBack) {
+                      if (!confirm(`Are you sure you want to send this job back to ${a.sendBack}?`)) return;
                       setSendBackTarget(a.sendBack);
                       setSendBackNote("");
                       setError("");

@@ -73,6 +73,7 @@ function EditableCell({ value, prefix, suffix, onSave }: EditableCellProps) {
           step="0.01"
           value={draft}
           disabled={saving}
+          aria-label="Edit price"
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") commit();

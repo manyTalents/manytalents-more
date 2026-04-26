@@ -70,6 +70,7 @@ function NewEstimateInner() {
   const [submitting, setSubmitting] = useState(false);
   const [submitAction, setSubmitAction] = useState<"draft" | "send">("draft");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Confirmation modal for Send
   const [showSendModal, setShowSendModal] = useState(false);
@@ -177,29 +178,31 @@ function NewEstimateInner() {
   };
 
   const validate = () => {
+    const errs: Record<string, string> = {};
     if (!customerName && !customerInput.trim()) {
-      setError("Customer is required");
-      return false;
+      errs.customer = "Customer is required";
     }
     for (const opt of options) {
       if (!opt.name_label.trim()) {
-        setError("Each option must have a name");
-        return false;
+        errs[`opt_${opt.id}_name`] = "Option name is required";
       }
       for (const li of opt.line_items) {
         if (!li.description.trim()) {
-          setError("All line items must have a description");
-          return false;
+          errs[`li_${li.id}_description`] = "Description is required";
         }
         if ((parseFloat(li.qty) || 0) <= 0) {
-          setError(`Line item "${li.description || "(no description)"}" in "${opt.name_label}" has invalid quantity. Qty must be greater than 0.`);
-          return false;
+          errs[`li_${li.id}_qty`] = "Qty must be > 0";
         }
         if ((parseFloat(li.rate) || 0) <= 0) {
-          setError(`Line item "${li.description || "(no description)"}" in "${opt.name_label}" has a $0 rate. Rate must be greater than 0.`);
-          return false;
+          errs[`li_${li.id}_rate`] = "Rate must be > 0";
         }
       }
+    }
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      const first = Object.values(errs)[0];
+      setError(first);
+      return false;
     }
     return true;
   };
@@ -280,11 +283,11 @@ function NewEstimateInner() {
               <input
                 type="text"
                 value={customerInput}
-                onChange={(e) => handleCustomerSearch(e.target.value)}
+                onChange={(e) => { handleCustomerSearch(e.target.value); setFieldErrors((prev) => { const next = { ...prev }; delete next.customer; return next; }); }}
                 onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                 placeholder="Search customer name..."
-                className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream placeholder-neutral-600 focus:outline-none focus:border-gold-dark transition"
+                className={`w-full bg-navy border rounded-lg px-4 py-3 text-cream placeholder-neutral-600 focus:outline-none focus:border-gold-dark transition ${fieldErrors.customer ? "border-red-500" : "border-navy-border"}`}
               />
               {showSuggestions && (
                 <div className="absolute z-20 top-full mt-1 w-full bg-navy-surface border border-navy-border rounded-lg shadow-xl max-h-48 overflow-y-auto">
@@ -415,9 +418,9 @@ function NewEstimateInner() {
                   <input
                     type="text"
                     value={opt.name_label}
-                    onChange={(e) => updateOptionName(opt.id, e.target.value)}
+                    onChange={(e) => { updateOptionName(opt.id, e.target.value); setFieldErrors((prev) => { const next = { ...prev }; delete next[`opt_${opt.id}_name`]; return next; }); }}
                     placeholder="Option name (e.g. 14 SEER AC Replacement)"
-                    className="flex-1 bg-navy border border-navy-border rounded-lg px-4 py-2.5 text-cream text-sm font-medium placeholder-neutral-600 focus:outline-none focus:border-gold-dark transition"
+                    className={`flex-1 bg-navy border rounded-lg px-4 py-2.5 text-cream text-sm font-medium placeholder-neutral-600 focus:outline-none focus:border-gold-dark transition ${fieldErrors[`opt_${opt.id}_name`] ? "border-red-500" : "border-navy-border"}`}
                   />
                   {options.length > 1 && (
                     <button
@@ -451,9 +454,9 @@ function NewEstimateInner() {
                           <input
                             type="text"
                             value={li.description}
-                            onChange={(e) => updateLineItem(opt.id, li.id, "description", e.target.value)}
+                            onChange={(e) => { updateLineItem(opt.id, li.id, "description", e.target.value); setFieldErrors((prev) => { const next = { ...prev }; delete next[`li_${li.id}_description`]; return next; }); }}
                             placeholder="Service or part description"
-                            className="w-full bg-navy border border-navy-border rounded-lg px-3 py-2 text-cream text-sm placeholder-neutral-600 focus:outline-none focus:border-gold-dark transition"
+                            className={`w-full bg-navy border rounded-lg px-3 py-2 text-cream text-sm placeholder-neutral-600 focus:outline-none focus:border-gold-dark transition ${fieldErrors[`li_${li.id}_description`] ? "border-red-500" : "border-navy-border"}`}
                           />
                         </div>
                         <div className="col-span-2">
@@ -462,8 +465,8 @@ function NewEstimateInner() {
                             min="0"
                             step="0.5"
                             value={li.qty}
-                            onChange={(e) => updateLineItem(opt.id, li.id, "qty", e.target.value)}
-                            className="w-full bg-navy border border-navy-border rounded-lg px-3 py-2 text-cream text-sm text-center focus:outline-none focus:border-gold-dark transition"
+                            onChange={(e) => { updateLineItem(opt.id, li.id, "qty", e.target.value); setFieldErrors((prev) => { const next = { ...prev }; delete next[`li_${li.id}_qty`]; return next; }); }}
+                            className={`w-full bg-navy border rounded-lg px-3 py-2 text-cream text-sm text-center focus:outline-none focus:border-gold-dark transition ${fieldErrors[`li_${li.id}_qty`] ? "border-red-500" : "border-navy-border"}`}
                           />
                         </div>
                         <div className="col-span-2">
@@ -472,9 +475,9 @@ function NewEstimateInner() {
                             min="0"
                             step="0.01"
                             value={li.rate}
-                            onChange={(e) => updateLineItem(opt.id, li.id, "rate", e.target.value)}
+                            onChange={(e) => { updateLineItem(opt.id, li.id, "rate", e.target.value); setFieldErrors((prev) => { const next = { ...prev }; delete next[`li_${li.id}_rate`]; return next; }); }}
                             placeholder="0.00"
-                            className="w-full bg-navy border border-navy-border rounded-lg px-3 py-2 text-cream text-sm text-right focus:outline-none focus:border-gold-dark transition"
+                            className={`w-full bg-navy border rounded-lg px-3 py-2 text-cream text-sm text-right focus:outline-none focus:border-gold-dark transition ${fieldErrors[`li_${li.id}_rate`] ? "border-red-500" : "border-navy-border"}`}
                           />
                         </div>
                         <div className="col-span-1 text-right text-sm font-medium text-cream">

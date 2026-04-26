@@ -169,7 +169,7 @@ export default function CustomersPage() {
                     {customers.length === 0 && (
                       <tr>
                         <td colSpan={6} className="px-5 py-12 text-center text-neutral-500">
-                          No customers found
+                          {error ? "Search failed. Try again." : "No customers found"}
                         </td>
                       </tr>
                     )}
@@ -201,7 +201,9 @@ export default function CustomersPage() {
                   </Link>
                 ))}
                 {customers.length === 0 && (
-                  <p className="px-4 py-12 text-center text-neutral-500">No customers found</p>
+                  <p className="px-4 py-12 text-center text-neutral-500">
+                    {error ? "Search failed. Try again." : "No customers found"}
+                  </p>
                 )}
               </div>
             </div>

@@ -37,7 +37,7 @@ export default function NavBar() {
 
   return (
     <>
-      <nav className="border-b border-navy-border bg-navy-surface/80 backdrop-blur-xl sticky top-0 z-30">
+      <nav aria-label="Main navigation" className="border-b border-navy-border bg-navy-surface/80 backdrop-blur-xl sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           {/* Brand */}
           <Link href="/manager/dashboard" className="flex items-center gap-2 flex-shrink-0">
@@ -82,6 +82,8 @@ export default function NavBar() {
             {/* Mobile hamburger */}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
+              aria-expanded={mobileOpen}
+              aria-label="Toggle menu"
               className="md:hidden p-1.5 rounded-lg hover:bg-white/10 transition"
             >
               <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

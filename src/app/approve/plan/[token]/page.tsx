@@ -273,13 +273,16 @@ function PlanApprovalInner() {
         {/* Action buttons */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-6">
           <p className="text-sm text-gray-600 mb-5 leading-relaxed">
-            By approving this plan, you authorize recurring service visits and billing as described
-            above. You may cancel at any time by contacting our office.
+            <label htmlFor="auth-acknowledge">
+              By approving this plan, you authorize recurring service visits and billing as described
+              above. You may cancel at any time by contacting our office.
+            </label>
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={handleApprove}
               disabled={acting}
+              aria-label="Approve service plan"
               className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl text-sm transition disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {acting && actingAction === "approve" ? (
@@ -294,6 +297,7 @@ function PlanApprovalInner() {
             <button
               onClick={handleDecline}
               disabled={acting}
+              aria-label="Decline service plan"
               className="flex-1 sm:flex-none sm:px-8 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold py-3.5 rounded-xl text-sm transition disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {acting && actingAction === "decline" ? (

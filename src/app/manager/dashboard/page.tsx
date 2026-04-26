@@ -70,6 +70,7 @@ export default function DashboardPage() {
     paid_today: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [countError, setCountError] = useState(false);
 
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -135,7 +136,10 @@ export default function DashboardPage() {
     }
     getWorkflowCounts()
       .then(setCounts)
-      .catch((err) => console.warn("Failed to load counts:", err))
+      .catch((err) => {
+        console.warn("Failed to load counts:", err);
+        setCountError(true);
+      })
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -157,6 +161,12 @@ export default function DashboardPage() {
           </p>
         </div>
 
+        {countError && (
+          <div className="bg-red-950/40 border border-red-900/60 rounded-lg px-4 py-3 text-sm text-red-300 mb-4">
+            Unable to load counts
+          </div>
+        )}
+
         {/* Pipeline cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {PIPELINE.map((card) => (
@@ -169,7 +179,7 @@ export default function DashboardPage() {
                 {card.label}
               </p>
               <p className="text-5xl font-serif font-extrabold mb-3 text-gold-gradient">
-                {loading ? "..." : counts[card.key]}
+                {loading ? "..." : countError ? "—" : counts[card.key]}
               </p>
               <p className="text-xs text-neutral-500">{card.description}</p>
               <div
