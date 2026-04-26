@@ -106,6 +106,16 @@ export async function getJobList() {
   return await callMethod(`${API}.get_job_list`);
 }
 
+export async function getManagerJobs(params: {
+  mode?: "active" | "all";
+  search?: string;
+  status?: string;
+  page_length?: number;
+  page?: number;
+}) {
+  return await callMethod(`${API}.get_manager_jobs`, params);
+}
+
 export async function getJobDetail(jobName: string) {
   return await callMethod(`${API}.get_job_detail`, { job_name: jobName });
 }
