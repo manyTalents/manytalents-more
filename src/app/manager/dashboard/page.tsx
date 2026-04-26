@@ -24,13 +24,6 @@ interface PipelineCard {
 
 const PIPELINE: PipelineCard[] = [
   {
-    key: "finished",
-    label: "Finished",
-    description: "Tech completed, office to review",
-    color: "from-orange-500 to-orange-600",
-    href: "/manager/section/finished",
-  },
-  {
     key: "needs_checked",
     label: "Needs Checked",
     description: "Ready for Adam's approval",
