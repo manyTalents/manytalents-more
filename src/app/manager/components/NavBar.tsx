@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { clearAuth } from "@/lib/frappe";
+import { clearAuth, globalSearch, type SearchResult } from "@/lib/frappe";
 import EventBadge from "./EventBadge";
 import EventPanel from "./EventPanel";
 
@@ -19,11 +19,33 @@ const NAV_LINKS = [
   { href: "/manager/admin/techs", label: "Team" },
 ] as const;
 
+const STATUS_COLORS: Record<string, string> = {
+  Entered: "bg-neutral-700 text-neutral-300",
+  Scheduled: "bg-blue-900/60 text-blue-300",
+  Assigned: "bg-indigo-900/60 text-indigo-300",
+  "In Progress": "bg-cyan-900/60 text-cyan-300",
+  "On Hold": "bg-amber-900/60 text-amber-300",
+  Completed: "bg-orange-900/60 text-orange-300",
+  "Needs Check": "bg-purple-900/60 text-purple-300",
+  Checked: "bg-blue-900/60 text-blue-300",
+  Invoiced: "bg-amber-900/60 text-amber-300",
+  Paid: "bg-emerald-900/60 text-emerald-300",
+  Canceled: "bg-red-900/60 text-red-300",
+};
+
 export default function NavBar() {
   const router = useRouter();
   const pathname = usePathname();
   const [eventPanelOpen, setEventPanelOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Search state
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
     clearAuth();
@@ -34,6 +56,46 @@ export default function NavBar() {
     if (href === "/manager/dashboard") return pathname === href;
     return pathname.startsWith(href);
   };
+
+  // Debounced search
+  const handleSearch = useCallback((q: string) => {
+    setSearch(q);
+    clearTimeout(searchTimer.current);
+    if (q.trim().length < 2) {
+      setResults([]);
+      setSearchOpen(false);
+      return;
+    }
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const r = await globalSearch(q);
+        setResults(r);
+        setSearchOpen(true);
+      } catch {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+  }, []);
+
+  // Close on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Close on navigate
+  useEffect(() => {
+    setSearchOpen(false);
+    setSearch("");
+  }, [pathname]);
 
   return (
     <>
@@ -94,6 +156,57 @@ export default function NavBar() {
                 )}
               </svg>
             </button>
+          </div>
+        </div>
+
+        {/* Global Search Bar */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-3" ref={searchRef}>
+          <div className="relative">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Search jobs — customer, address, job #..."
+              className="w-full bg-navy border border-navy-border rounded-lg px-4 py-2 text-sm text-cream placeholder-neutral-600 focus:outline-none focus:border-gold-dark transition"
+            />
+            {searching && (
+              <div className="absolute right-3 top-2.5">
+                <div className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+              </div>
+            )}
+
+            {/* Results dropdown */}
+            {searchOpen && results.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-navy-surface border border-navy-border rounded-xl shadow-2xl max-h-96 overflow-y-auto z-50">
+                {results.map((r) => (
+                  <Link
+                    key={r.job_name}
+                    href={`/manager/jobs/${r.job_name}`}
+                    onClick={() => { setSearchOpen(false); setSearch(""); }}
+                    className="block px-4 py-3 hover:bg-white/5 border-b border-navy-border last:border-0 transition"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{r.customer_name || "Unknown"}</span>
+                          <span className="text-xs text-gold">#{r.hcp_job_id}</span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${STATUS_COLORS[r.status] || "bg-neutral-700 text-neutral-300"}`}>
+                            {r.status}
+                          </span>
+                        </div>
+                        <p className="text-xs text-neutral-500 truncate mt-0.5">{r.address}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {searchOpen && search.trim().length >= 2 && results.length === 0 && !searching && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-navy-surface border border-navy-border rounded-xl shadow-2xl z-50 px-4 py-3">
+                <p className="text-sm text-neutral-500">No results for &ldquo;{search}&rdquo;</p>
+              </div>
+            )}
           </div>
         </div>
 
