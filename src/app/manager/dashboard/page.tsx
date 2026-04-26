@@ -135,13 +135,18 @@ export default function DashboardPage() {
       return;
     }
     // Load pipeline counts
-    // Only count Completed jobs with actual charges — $0 jobs are old HCP imports
-    // already invoiced/paid in HCP, not real actionable items
+    // Only count Completed jobs created within the last year.
+    // creation date is set once on insert and never changes (unlike modified
+    // which HCP sync refreshes). Old bulk-imported jobs have old creation dates.
+    const cutoff = new Date();
+    cutoff.setFullYear(cutoff.getFullYear() - 1);
+    const cutoffStr = cutoff.toISOString().split("T")[0];
+
     Promise.all([
       getWorkflowCounts(),
       callMethod<number>("frappe.client.get_count", {
         doctype: "HCP Job",
-        filters: { status: "Completed", total_job_cost: [">", 0] },
+        filters: { status: "Completed", creation: [">", cutoffStr] },
       }),
     ])
       .then(([wf, recentFinished]) => {
