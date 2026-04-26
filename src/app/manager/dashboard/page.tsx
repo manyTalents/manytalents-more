@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getAuth, getWorkflowCounts, callMethod, globalSearch, type WorkflowCounts, type SearchResult } from "@/lib/frappe";
+import { getAuth, getWorkflowCounts, globalSearch, type WorkflowCounts, type SearchResult } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 import ARAgingWidget from "./widgets/ARAgingWidget";
 import JobRevenueWidget from "./widgets/JobRevenueWidget";
@@ -134,24 +134,8 @@ export default function DashboardPage() {
       router.replace("/manager");
       return;
     }
-    // Load pipeline counts
-    // Only count Completed jobs created within the last year.
-    // creation date is set once on insert and never changes (unlike modified
-    // which HCP sync refreshes). Old bulk-imported jobs have old creation dates.
-    const cutoff = new Date();
-    cutoff.setFullYear(cutoff.getFullYear() - 1);
-    const cutoffStr = cutoff.toISOString().split("T")[0];
-
-    Promise.all([
-      getWorkflowCounts(),
-      callMethod<number>("frappe.client.get_count", {
-        doctype: "HCP Job",
-        filters: { status: "Completed", creation: [">", cutoffStr] },
-      }),
-    ])
-      .then(([wf, recentFinished]) => {
-        setCounts({ ...wf, finished: recentFinished || 0 });
-      })
+    getWorkflowCounts()
+      .then(setCounts)
       .catch((err) => {
         console.warn("Failed to load counts:", err);
         setCountError(true);
