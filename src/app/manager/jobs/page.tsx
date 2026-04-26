@@ -172,15 +172,10 @@ export default function JobsPage() {
                     {searchResults.length} result{searchResults.length !== 1 ? "s" : ""}
                   </p>
                   <div className="space-y-2">
-                    {searchResults.slice(0, 50).map((job) => (
+                    {searchResults.map((job) => (
                       <JobCard key={job.name} job={job} />
                     ))}
                   </div>
-                  {searchResults.length > 50 && (
-                    <p className="text-xs text-neutral-500 mt-3 px-2">
-                      Showing first 50 of {searchResults.length}. Refine your search.
-                    </p>
-                  )}
                 </>
               ) : (
                 <p className="text-sm text-neutral-500 px-2">No jobs match &ldquo;{globalSearch}&rdquo;</p>
@@ -252,14 +247,9 @@ export default function JobsPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {filteredAllJobs.slice(0, 50).map((job) => (
+                  {filteredAllJobs.map((job) => (
                     <JobCard key={job.name} job={job} />
                   ))}
-                  {filteredAllJobs.length > 50 && (
-                    <p className="text-center text-sm text-neutral-500 py-4">
-                      Showing 50 of {filteredAllJobs.length} — use search to find specific jobs
-                    </p>
-                  )}
                 </div>
               )}
             </section>
