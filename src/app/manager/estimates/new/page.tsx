@@ -76,7 +76,7 @@ function NewEstimateInner() {
 
   // Auth guard
   useEffect(() => {
-    if (!getAuth()) router.replace("/manager");
+    if (!getAuth()) { router.replace("/manager"); return; }
   }, [router]);
 
   // ── Customer search ──
@@ -189,6 +189,14 @@ function NewEstimateInner() {
       for (const li of opt.line_items) {
         if (!li.description.trim()) {
           setError("All line items must have a description");
+          return false;
+        }
+        if ((parseFloat(li.qty) || 0) <= 0) {
+          setError(`Line item "${li.description || "(no description)"}" in "${opt.name_label}" has invalid quantity. Qty must be greater than 0.`);
+          return false;
+        }
+        if ((parseFloat(li.rate) || 0) <= 0) {
+          setError(`Line item "${li.description || "(no description)"}" in "${opt.name_label}" has a $0 rate. Rate must be greater than 0.`);
           return false;
         }
       }

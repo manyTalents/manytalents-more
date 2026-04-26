@@ -630,7 +630,7 @@ export default function JobDetailPage() {
                         {s.qty}
                       </td>
                       <td className="py-2 px-4 text-right text-neutral-400">
-                        ${fmtCurrency(s.rate).replace("$", "")}
+                        {fmtCurrency(s.rate)}
                       </td>
                       <td className="py-2 pl-4 text-right text-gold font-medium">
                         {fmtCurrency(s.amount || s.qty * s.rate)}

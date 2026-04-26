@@ -338,14 +338,16 @@ export default function ServicePlanDetailPage() {
                   </button>
                 )}
 
-                {/* Cancel — always visible when not cancelled */}
-                <button
-                  onClick={handleCancel}
-                  disabled={acting}
-                  className="inline-flex items-center gap-2 bg-navy border border-red-900/50 text-red-400 font-semibold px-5 py-2.5 rounded-lg text-sm hover:bg-red-950/20 transition disabled:opacity-60"
-                >
-                  Cancel Plan
-                </button>
+                {/* Cancel — only for Active or Sent plans */}
+                {["Active", "Sent"].includes(plan.status) && (
+                  <button
+                    onClick={handleCancel}
+                    disabled={acting}
+                    className="inline-flex items-center gap-2 bg-navy border border-red-900/50 text-red-400 font-semibold px-5 py-2.5 rounded-lg text-sm hover:bg-red-950/20 transition disabled:opacity-60"
+                  >
+                    Cancel Plan
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -12,6 +12,8 @@ export const WIDGET_CATALOG: WidgetConfig[] = [
   { id: "ar-aging", title: "A/R Aging", component: "ARAgingWidget", defaultWidth: "full" },
   { id: "needs-check", title: "Needs Check", component: "NeedsCheckWidget", defaultWidth: "half" },
   { id: "need-estimate", title: "Need Estimate", component: "NeedEstimateWidget", defaultWidth: "half" },
+  { id: "service-plans-due", title: "Service Plans Due", component: "ServicePlansDueWidget", defaultWidth: "half" },
+  { id: "jobs-images", title: "Jobs Images", component: "JobsImagesWidget", defaultWidth: "full" },
 ];
 
 export type RolePreset = "office" | "operations" | "owner";

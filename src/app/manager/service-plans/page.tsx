@@ -310,7 +310,7 @@ export default function ServicePlansPage() {
 
   // Auth guard
   useEffect(() => {
-    if (!getAuth()) router.replace("/manager");
+    if (!getAuth()) { router.replace("/manager"); return; }
   }, [router]);
 
   // Load templates once

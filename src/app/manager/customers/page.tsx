@@ -32,6 +32,7 @@ export default function CustomersPage() {
   useEffect(() => {
     if (!getAuth()) {
       router.replace("/manager");
+      return;
     }
   }, [router]);
 

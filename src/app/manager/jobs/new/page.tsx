@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   getAuth,
   getDefaultLaborRate,
@@ -34,8 +34,10 @@ function handlePhoneChange(
 // ── Trade checkboxes ──
 const TRADES = ["Electrical", "HVAC", "Plumbing"] as const;
 
-export default function NewJobPage() {
+function NewJobInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const customerParam = searchParams.get("customer") || "";
 
   // Customer
   const [customerName, setCustomerName] = useState("");
@@ -99,6 +101,26 @@ export default function NewJobPage() {
     listTechs()
       .then((list) => setTechList(list || []))
       .catch(() => {});
+    // Pre-populate customer from ?customer= query param
+    if (customerParam) {
+      searchCustomers(customerParam)
+        .then((results) => {
+          const match = (results || []).find(
+            (c: any) => c.name === customerParam || c.customer_name === customerParam
+          );
+          if (match) {
+            selectCustomer(match);
+          } else if (results && results.length > 0) {
+            selectCustomer(results[0]);
+          } else {
+            setCustomerName(customerParam);
+          }
+        })
+        .catch(() => {
+          setCustomerName(customerParam);
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   // ── Customer search ──
@@ -681,5 +703,19 @@ export default function NewJobPage() {
         </button>
       </main>
     </div>
+  );
+}
+
+export default function NewJobPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <NewJobInner />
+    </Suspense>
   );
 }

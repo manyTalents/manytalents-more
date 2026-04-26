@@ -48,7 +48,7 @@ export default function EstimatesPage() {
 
   // Auth guard
   useEffect(() => {
-    if (!getAuth()) router.replace("/manager");
+    if (!getAuth()) { router.replace("/manager"); return; }
   }, [router]);
 
   const fetchEstimates = useCallback(async (filter: StatusFilter, pg: number, append: boolean) => {
