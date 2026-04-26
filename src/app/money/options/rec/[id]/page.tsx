@@ -29,7 +29,7 @@ export default async function RationalePage({ params }: Props) {
 
   const { data: rec } = await supabase
     .from("recommendations")
-    .select("id, ticker, direction, confidence, rationale, reasons, kill_conditions, rank, run_id, created_at")
+    .select("id, ticker, direction, confidence, rationale, reasons, kill_conditions, rank, run_id, created_at, expected_return_pct, verify_url")
     .eq("id", id)
     .single()
 
