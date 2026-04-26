@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getAuth, getManagerJobs } from "@/lib/frappe";
+import { getAuth, getJobList } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 
 interface Job {
@@ -17,15 +17,7 @@ interface Job {
   scheduled_date: string;
   priority: number;
   total_job_cost: number;
-  modified: string;
   assigned_techs: Array<{ tech_name: string; tech_user: string }>;
-}
-
-interface JobResult {
-  jobs: Job[];
-  total: number;
-  page: number;
-  page_length: number;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -42,19 +34,12 @@ const STATUS_COLORS: Record<string, string> = {
   Canceled: "bg-red-900/60 text-red-300",
 };
 
+const TERMINAL_STATUSES = new Set(["Completed", "Checked", "Paid", "Canceled", "Invoiced"]);
+
 const ALL_STATUSES = [
   "all",
-  "Entered",
-  "Scheduled",
-  "Assigned",
-  "In Progress",
-  "On Hold",
-  "Completed",
-  "Needs Check",
-  "Checked",
-  "Invoiced",
-  "Paid",
-  "Canceled",
+  "Entered", "Scheduled", "Assigned", "In Progress", "On Hold",
+  "Completed", "Needs Check", "Checked", "Invoiced", "Paid", "Canceled",
 ];
 
 function JobCard({ job }: { job: Job }) {
@@ -113,87 +98,55 @@ function JobCard({ job }: { job: Job }) {
 
 export default function JobsPage() {
   const router = useRouter();
-
-  // Global search
-  const [globalSearch, setGlobalSearch] = useState("");
-  const [searchResults, setSearchResults] = useState<Job[]>([]);
-  const [searchTotal, setSearchTotal] = useState(0);
-  const [searching, setSearching] = useState(false);
-
-  // Active jobs
-  const [activeJobs, setActiveJobs] = useState<Job[]>([]);
-  const [activeTotal, setActiveTotal] = useState(0);
-  const [activeLoading, setActiveLoading] = useState(true);
-
-  // All jobs
   const [allJobs, setAllJobs] = useState<Job[]>([]);
-  const [allTotal, setAllTotal] = useState(0);
-  const [allPage, setAllPage] = useState(1);
-  const [allStatus, setAllStatus] = useState("all");
-  const [allLoading, setAllLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [allStatusFilter, setAllStatusFilter] = useState("all");
 
-  // Auth check + load active jobs
+  // Load all jobs once from the existing endpoint
   useEffect(() => {
     if (!getAuth()) {
       router.replace("/manager");
       return;
     }
-    getManagerJobs({ mode: "active", page_length: 200 })
-      .then((res: JobResult) => {
-        setActiveJobs(res.jobs);
-        setActiveTotal(res.total);
-      })
-      .catch((err) => console.warn("Failed to load active jobs:", err))
-      .finally(() => setActiveLoading(false));
+    getJobList()
+      .then((data: any) => setAllJobs(data || []))
+      .catch((err) => console.warn("Failed to load jobs:", err))
+      .finally(() => setLoading(false));
   }, [router]);
 
-  // Load all jobs (with pagination + status filter)
-  const loadAllJobs = useCallback(
-    (page: number, status: string) => {
-      setAllLoading(true);
-      getManagerJobs({
-        mode: "all",
-        status_filter: status === "all" ? "" : status,
-        page_length: 50,
-        page,
-      })
-        .then((res: JobResult) => {
-          setAllJobs(res.jobs);
-          setAllTotal(res.total);
-          setAllPage(res.page);
-        })
-        .catch((err) => console.warn("Failed to load all jobs:", err))
-        .finally(() => setAllLoading(false));
-    },
-    []
-  );
+  // Client-side search filter
+  const matchesSearch = (job: Job, q: string) => {
+    if (!q) return true;
+    const lower = q.toLowerCase();
+    return (
+      (job.customer_name || "").toLowerCase().includes(lower) ||
+      (job.address || "").toLowerCase().includes(lower) ||
+      (job.hcp_job_id || "").toLowerCase().includes(lower) ||
+      (job.description || "").toLowerCase().includes(lower) ||
+      (job.town || "").toLowerCase().includes(lower)
+    );
+  };
 
-  // Load all jobs on mount
-  useEffect(() => {
-    if (getAuth()) loadAllJobs(1, "all");
-  }, [loadAllJobs]);
+  // Active jobs = non-terminal status (client-side filter)
+  const activeJobs = useMemo(() => {
+    return allJobs.filter((j) => !TERMINAL_STATUSES.has(j.status));
+  }, [allJobs]);
 
-  // Global search (debounced)
-  useEffect(() => {
-    if (!globalSearch.trim()) {
-      setSearchResults([]);
-      setSearchTotal(0);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setSearching(true);
-      getManagerJobs({ mode: "all", search: globalSearch.trim(), page_length: 20 })
-        .then((res: JobResult) => {
-          setSearchResults(res.jobs);
-          setSearchTotal(res.total);
-        })
-        .catch(() => {})
-        .finally(() => setSearching(false));
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [globalSearch]);
+  // Search results
+  const searchResults = useMemo(() => {
+    if (!globalSearch.trim()) return [];
+    return allJobs.filter((j) => matchesSearch(j, globalSearch));
+  }, [allJobs, globalSearch]);
 
-  const allTotalPages = Math.ceil(allTotal / 50);
+  // All jobs section with status filter
+  const filteredAllJobs = useMemo(() => {
+    return allJobs.filter((j) => {
+      if (allStatusFilter !== "all" && j.status !== allStatusFilter) return false;
+      return true;
+    });
+  }, [allJobs, allStatusFilter]);
+
   const isSearching = globalSearch.trim().length > 0;
 
   return (
@@ -211,36 +164,39 @@ export default function JobsPage() {
             className="w-full bg-navy-surface border border-navy-border rounded-xl px-6 py-4 text-cream text-lg placeholder-neutral-600 focus:outline-none focus:border-gold transition"
           />
 
-          {/* Search results dropdown */}
           {isSearching && (
             <div className="mt-3">
-              {searching ? (
-                <p className="text-sm text-neutral-500 px-2">Searching...</p>
-              ) : searchResults.length > 0 ? (
+              {searchResults.length > 0 ? (
                 <>
                   <p className="text-xs uppercase tracking-wider text-neutral-500 mb-3 px-2">
-                    {searchTotal} result{searchTotal !== 1 ? "s" : ""} found
+                    {searchResults.length} result{searchResults.length !== 1 ? "s" : ""}
                   </p>
                   <div className="space-y-2">
-                    {searchResults.map((job) => (
+                    {searchResults.slice(0, 50).map((job) => (
                       <JobCard key={job.name} job={job} />
                     ))}
                   </div>
-                  {searchTotal > 20 && (
+                  {searchResults.length > 50 && (
                     <p className="text-xs text-neutral-500 mt-3 px-2">
-                      Showing first 20 of {searchTotal}. Refine your search for more.
+                      Showing first 50 of {searchResults.length}. Refine your search.
                     </p>
                   )}
                 </>
               ) : (
-                <p className="text-sm text-neutral-500 px-2">No jobs match "{globalSearch}"</p>
+                <p className="text-sm text-neutral-500 px-2">No jobs match &ldquo;{globalSearch}&rdquo;</p>
               )}
             </div>
           )}
         </div>
 
-        {/* Only show sections when NOT searching */}
-        {!isSearching && (
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+            <span className="ml-3 text-neutral-400 text-sm">Loading jobs...</span>
+          </div>
+        )}
+
+        {!loading && !isSearching && (
           <>
             {/* ── Active Jobs ─────────────────────────────────── */}
             <section className="mb-12">
@@ -249,16 +205,11 @@ export default function JobsPage() {
                   Active Jobs
                 </h2>
                 <span className="text-sm text-neutral-500">
-                  {activeLoading ? "..." : `${activeTotal} active`}
+                  {activeJobs.length} active
                 </span>
               </div>
 
-              {activeLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
-                  <span className="ml-3 text-neutral-400 text-sm">Loading...</span>
-                </div>
-              ) : activeJobs.length === 0 ? (
+              {activeJobs.length === 0 ? (
                 <div className="text-center py-12 text-neutral-500 bg-navy-surface border border-navy-border rounded-xl">
                   <p>No active jobs</p>
                 </div>
@@ -279,14 +230,11 @@ export default function JobsPage() {
                 </h2>
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-neutral-500">
-                    {allLoading ? "..." : `${allTotal} total`}
+                    {filteredAllJobs.length} of {allJobs.length}
                   </span>
                   <select
-                    value={allStatus}
-                    onChange={(e) => {
-                      setAllStatus(e.target.value);
-                      loadAllJobs(1, e.target.value);
-                    }}
+                    value={allStatusFilter}
+                    onChange={(e) => setAllStatusFilter(e.target.value)}
                     className="bg-navy-surface border border-navy-border rounded-lg px-3 py-1.5 text-sm text-cream focus:outline-none focus:border-gold-dark"
                   >
                     {ALL_STATUSES.map((s) => (
@@ -298,46 +246,21 @@ export default function JobsPage() {
                 </div>
               </div>
 
-              {allLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
-                  <span className="ml-3 text-neutral-400 text-sm">Loading...</span>
-                </div>
-              ) : allJobs.length === 0 ? (
+              {filteredAllJobs.length === 0 ? (
                 <div className="text-center py-12 text-neutral-500 bg-navy-surface border border-navy-border rounded-xl">
                   <p>No jobs found</p>
                 </div>
               ) : (
-                <>
-                  <div className="space-y-3">
-                    {allJobs.map((job) => (
-                      <JobCard key={job.name} job={job} />
-                    ))}
-                  </div>
-
-                  {/* Pagination */}
-                  {allTotalPages > 1 && (
-                    <div className="flex items-center justify-center gap-3 mt-6">
-                      <button
-                        onClick={() => loadAllJobs(allPage - 1, allStatus)}
-                        disabled={allPage <= 1}
-                        className="px-4 py-2 rounded-lg bg-navy-surface border border-navy-border text-sm text-cream disabled:opacity-30 hover:border-gold-dark transition"
-                      >
-                        Prev
-                      </button>
-                      <span className="text-sm text-neutral-500">
-                        Page {allPage} of {allTotalPages}
-                      </span>
-                      <button
-                        onClick={() => loadAllJobs(allPage + 1, allStatus)}
-                        disabled={allPage >= allTotalPages}
-                        className="px-4 py-2 rounded-lg bg-navy-surface border border-navy-border text-sm text-cream disabled:opacity-30 hover:border-gold-dark transition"
-                      >
-                        Next
-                      </button>
-                    </div>
+                <div className="space-y-3">
+                  {filteredAllJobs.slice(0, 50).map((job) => (
+                    <JobCard key={job.name} job={job} />
+                  ))}
+                  {filteredAllJobs.length > 50 && (
+                    <p className="text-center text-sm text-neutral-500 py-4">
+                      Showing 50 of {filteredAllJobs.length} — use search to find specific jobs
+                    </p>
                   )}
-                </>
+                </div>
               )}
             </section>
           </>
