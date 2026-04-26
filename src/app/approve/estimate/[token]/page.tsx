@@ -319,7 +319,7 @@ function EstimateApprovalInner() {
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-3xl mx-auto px-6 py-5 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight">AllTec Pro</h1>
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight">AllTec Plumbing, Electrical &amp; HVAC</h1>
             <p className="text-xs text-gray-500">Professional Home Services</p>
           </div>
           <div className="text-right">

@@ -882,6 +882,10 @@ export async function approvePlan(token: string) {
   return callGuestMethod<{ status: string }>(`${PLANS_API}.approve_plan`, { token });
 }
 
+export async function declinePlan(token: string) {
+  return callGuestMethod<{ status: string }>(`${PLANS_API}.decline_plan`, { token });
+}
+
 export async function getPlanByToken(token: string) {
   return callGuestMethod<any>(`${PLANS_API}.get_plan_by_token`, { token });
 }

@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getAuth, getARAging, resendInvoice, type ARBucket, type ARInvoice } from "@/lib/frappe";
+import NavBar from "@/app/manager/components/NavBar";
 
 const BUCKET_LABELS = ["0-30", "31-60", "61-90", "91+"];
 
-export default function InvoicesPage() {
+function InvoicesInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialBucket = searchParams.get("bucket")?.replace("plus", "+") || "all";
@@ -59,12 +60,6 @@ export default function InvoicesPage() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-serif font-bold text-cream">Invoices</h1>
-        <button
-          onClick={() => router.push("/manager/dashboard")}
-          className="text-sm text-cream/50 hover:text-cream transition"
-        >
-          &larr; Dashboard
-        </button>
       </div>
 
       {/* Filter chips */}
@@ -147,6 +142,17 @@ export default function InvoicesPage() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+export default function InvoicesPage() {
+  return (
+    <div className="min-h-screen">
+      <NavBar />
+      <Suspense fallback={<div>Loading...</div>}>
+        <InvoicesInner />
+      </Suspense>
     </div>
   );
 }

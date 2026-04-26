@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useParams } from "next/navigation";
-import { approvePlan, getPlanByToken } from "@/lib/frappe";
+import { approvePlan, declinePlan, getPlanByToken } from "@/lib/frappe";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -83,8 +83,7 @@ function PlanApprovalInner() {
     setActingAction("decline");
     setActionError("");
     try {
-      // decline is a no-op on the token endpoint — we just show a UI state
-      // and let the team know the customer declined
+      await declinePlan(token);
       setOutcome("declined");
     } catch (err: any) {
       setActionError(err.message || "Could not process your response.");
@@ -198,7 +197,7 @@ function PlanApprovalInner() {
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-6 py-5 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight">AllTec Pro</h1>
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight">AllTec Plumbing, Electrical &amp; HVAC</h1>
             <p className="text-xs text-gray-500">Professional Home Services</p>
           </div>
           <div className="text-right">
