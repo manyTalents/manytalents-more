@@ -109,11 +109,11 @@ export async function getJobList() {
 export async function getManagerJobs(params: {
   mode?: "active" | "all";
   search?: string;
-  status?: string;
+  status_filter?: string;
   page_length?: number;
   page?: number;
 }) {
-  return await callMethod(`${API}.get_manager_jobs`, params);
+  return await callMethod(`${API}.get_job_list`, params);
 }
 
 export async function getJobDetail(jobName: string) {

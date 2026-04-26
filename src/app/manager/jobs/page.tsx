@@ -153,7 +153,7 @@ export default function JobsPage() {
       setAllLoading(true);
       getManagerJobs({
         mode: "all",
-        status: status === "all" ? "" : status,
+        status_filter: status === "all" ? "" : status,
         page_length: 50,
         page,
       })
