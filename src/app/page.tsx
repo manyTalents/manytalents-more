@@ -127,6 +127,35 @@ export default function LandingPage() {
               </svg>
             </span>
           </Link>
+
+          <a href="https://github.com/manyTalents/manytalentsmore-framework" target="_blank" rel="noopener noreferrer" className="product-card">
+            <div className="card-number">04</div>
+            <h3 className="card-title">
+              Build Your Own <span className="gold">AI Team</span>
+            </h3>
+            <p className="card-tagline">Open source. Free forever.</p>
+            <p className="card-description">
+              The framework behind everything we build. An AI orchestrator
+              named 10T delegates to a team of specialized personas — each
+              with their own identity, skills, and discipline. Hiring
+              pipeline. TDD. Systematic debugging. Standards that learn from
+              mistakes. Built on the Parable of the Talents.
+            </p>
+            <span className="card-link">
+              View on GitHub
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </span>
+          </a>
         </div>
       </section>
 
