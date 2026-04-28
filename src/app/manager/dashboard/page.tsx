@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getAuth, getWorkflowCounts, globalSearch, type WorkflowCounts, type SearchResult } from "@/lib/frappe";
+import { getAuth, getWorkflowCounts, type WorkflowCounts } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 import ARAgingWidget from "./widgets/ARAgingWidget";
 import JobRevenueWidget from "./widgets/JobRevenueWidget";
@@ -71,50 +71,6 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
   const [countError, setCountError] = useState(false);
-
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const searchRef = useRef<HTMLDivElement>(null);
-
-  const handleSearch = useCallback((q: string) => {
-    setSearch(q);
-    clearTimeout(searchTimer.current);
-    if (q.trim().length < 2) {
-      setResults([]);
-      setSearchOpen(false);
-      return;
-    }
-    searchTimer.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const r = await globalSearch(q);
-        setResults(r);
-        setSearchOpen(true);
-      } catch {
-        setResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
-  }, []);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setSearchOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const MATCH_LABELS: Record<string, string> = {
-    job_number: "Job #", customer: "Customer", address: "Address",
-    town: "Town", description: "Description", tech: "Tech", other: "",
-  };
 
   const STATUS_COLORS: Record<string, string> = {
     Entered: "bg-neutral-700 text-neutral-300",
