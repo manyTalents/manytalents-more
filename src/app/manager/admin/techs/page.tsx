@@ -172,6 +172,8 @@ export default function TeamPage() {
     secret: result.api_secret,
   }) : "";
 
+  // QR generated via API — credentials are in the URL but this is an internal admin page
+  // TODO: replace with client-side QR library (qrcode.react) to keep credentials local
   const qrImageUrl = result
     ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrData)}`
     : "";

@@ -29,16 +29,15 @@ export default async function RationalePage({ params }: Props) {
 
   const { data: rec } = await supabase
     .from("recommendations")
-    .select("id, ticker, direction, confidence, rationale, reasons, kill_conditions, rank, run_id, created_at, expected_return_pct, verify_url")
+    .select("id, ticker, direction, confidence, rank, run_id, created_at, expected_return_pct, verify_url")
     .eq("id", id)
     .single()
 
   if (!rec) notFound()
 
-  const reasons: string[] = Array.isArray(rec.reasons) ? rec.reasons : []
-  const killConditions: string[] = Array.isArray(rec.kill_conditions)
-    ? rec.kill_conditions
-    : []
+  // Rationale, reasons, and kill_conditions are gated — not fetched for public page
+  const reasons: string[] = []
+  const killConditions: string[] = []
 
   return (
     <div className="min-h-screen bg-navy-bg">
