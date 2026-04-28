@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { Suspense, useEffect, useState, useCallback, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { optionsApi } from "@/lib/options-api"
@@ -83,7 +83,15 @@ function ConfidenceBadge({ value }: { value: number }) {
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
-export default function OptionsPage() {
+export default function OptionsPageWrapper() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-navy-bg flex items-center justify-center"><div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" /></div>}>
+      <OptionsPage />
+    </Suspense>
+  )
+}
+
+function OptionsPage() {
   const searchParams = useSearchParams()
   const { toasts, addToast } = useToasts()
 

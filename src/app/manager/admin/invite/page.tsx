@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import NavBar from "@/app/manager/components/NavBar";
 import {
   getAuth,
   checkOfficeAccess,
@@ -143,22 +143,7 @@ export default function AdminInvitePage() {
 
   return (
     <div className="min-h-screen">
-      {/* Nav */}
-      <nav className="border-b border-navy-border bg-navy-surface/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-4">
-          <Link
-            href="/manager/dashboard"
-            className="text-neutral-400 hover:text-gold-light transition"
-          >
-            ← Dashboard
-          </Link>
-          <div className="h-5 w-px bg-navy-border" />
-          <div>
-            <h1 className="font-serif text-lg font-bold">Office Staff Access</h1>
-            <p className="text-xs text-neutral-500">Admin · Invite or onboard office users</p>
-          </div>
-        </div>
-      </nav>
+      <NavBar />
 
       <main className="max-w-3xl mx-auto px-6 py-10">
         <div className="bg-navy-surface border border-navy-border rounded-2xl p-8">
