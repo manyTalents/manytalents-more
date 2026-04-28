@@ -138,8 +138,11 @@ export default function CustomersPage() {
                     {customers.map((c) => (
                       <tr
                         key={c.name}
+                        role="link"
+                        tabIndex={0}
                         onClick={() => router.push(`/manager/customers/${encodeURIComponent(c.name)}`)}
-                        className="border-b border-navy-border/50 hover:bg-navy-card/50 transition cursor-pointer"
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") router.push(`/manager/customers/${encodeURIComponent(c.name)}`); }}
+                        className="border-b border-navy-border/50 hover:bg-navy-card/50 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-gold"
                       >
                         <td className="px-5 py-3.5">
                           <p className="text-sm font-medium text-cream">{c.customer_name}</p>

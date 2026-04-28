@@ -431,8 +431,11 @@ export default function ServicePlansPage() {
                     {plans.map((p) => (
                       <tr
                         key={p.name}
+                        role="link"
+                        tabIndex={0}
                         onClick={() => router.push(`/manager/service-plans/${encodeURIComponent(p.name)}`)}
-                        className="border-b border-navy-border/50 hover:bg-navy-card/50 transition cursor-pointer"
+                        onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") router.push(`/manager/service-plans/${encodeURIComponent(p.name)}`); }}
+                        className="border-b border-navy-border/50 hover:bg-navy-card/50 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-gold"
                       >
                         <td className="px-5 py-3.5">
                           <span className="text-sm font-medium text-gold">{p.template_name || p.name}</span>
