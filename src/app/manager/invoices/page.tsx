@@ -25,7 +25,7 @@ function InvoicesInner() {
       .then((res) => setBuckets(res.buckets))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [router]);
 
   const allInvoices = filter === "all"
     ? buckets.flatMap((b) => b.invoices)
@@ -119,7 +119,7 @@ function InvoicesInner() {
                 <tr key={inv.name} className="border-b border-navy-border/50 hover:bg-navy-card/50 transition">
                   <td className="px-4 py-3 text-sm text-cream font-mono">{inv.name}</td>
                   <td className="px-4 py-3 text-sm text-cream">{inv.customer}</td>
-                  <td className="px-4 py-3 text-sm text-cream text-right font-medium">${inv.amount.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-sm text-cream text-right font-medium">${inv.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-4 py-3 text-sm text-right font-bold text-cream/60">{inv.days}d</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`text-xs font-bold px-2 py-1 rounded ${colourBadge(inv.colour)}`}>
@@ -158,7 +158,7 @@ export default function InvoicesPage() {
   return (
     <div className="min-h-screen">
       <NavBar />
-      <Suspense fallback={<div>Loading...</div>}>
+      <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" /></div>}>
         <InvoicesInner />
       </Suspense>
     </div>

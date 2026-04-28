@@ -253,7 +253,7 @@ export default function EventsPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="bg-white border-b border-neutral-200 sticky top-[53px] z-10">
+      <div className="bg-navy-surface border-b border-navy-border sticky top-[120px] z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 space-y-2">
           {/* Row 1: Category + Date presets */}
           <div className="flex flex-wrap items-center gap-2">
@@ -299,7 +299,7 @@ export default function EventsPage() {
             <select
               value={eventType}
               onChange={(e) => { setEventType(e.target.value); setPage(1); }}
-              className="text-xs border border-neutral-200 rounded-lg px-2.5 py-1.5 bg-white text-neutral-700 focus:outline-none focus:border-[#c9a84c] transition"
+              className="text-xs border border-navy-border rounded-lg px-2.5 py-1.5 bg-navy text-cream focus:outline-none focus:border-[#c9a84c] transition"
             >
               <option value="all">All Types</option>
               {(Object.entries(EVENT_TYPE_LABELS) as [string, string][]).map(([k, v]) => (
@@ -311,7 +311,7 @@ export default function EventsPage() {
             <select
               value={severity}
               onChange={(e) => { setSeverity(e.target.value); setPage(1); }}
-              className="text-xs border border-neutral-200 rounded-lg px-2.5 py-1.5 bg-white text-neutral-700 focus:outline-none focus:border-[#c9a84c] transition"
+              className="text-xs border border-navy-border rounded-lg px-2.5 py-1.5 bg-navy text-cream focus:outline-none focus:border-[#c9a84c] transition"
             >
               <option value="all">All Severities</option>
               {(["success", "info", "warning", "error"] as EventSeverity[]).map((s) => (
@@ -323,7 +323,7 @@ export default function EventsPage() {
             <select
               value={groupBy}
               onChange={(e) => setGroupBy(e.target.value as GroupBy)}
-              className="text-xs border border-neutral-200 rounded-lg px-2.5 py-1.5 bg-white text-neutral-700 focus:outline-none focus:border-[#c9a84c] transition"
+              className="text-xs border border-navy-border rounded-lg px-2.5 py-1.5 bg-navy text-cream focus:outline-none focus:border-[#c9a84c] transition"
             >
               <option value="time">Group: Time</option>
               <option value="job">Group: Job</option>
@@ -336,7 +336,7 @@ export default function EventsPage() {
               className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border ${
                 compact
                   ? "border-[#080c18] bg-[#080c18] text-white"
-                  : "border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300"
+                  : "border-navy-border bg-navy text-neutral-400 hover:border-neutral-500"
               }`}
             >
               {compact ? "Detail" : "Compact"}
@@ -349,7 +349,7 @@ export default function EventsPage() {
                 value={searchInput}
                 onChange={(e) => handleSearchInput(e.target.value)}
                 placeholder="Search events..."
-                className="w-full text-xs border border-neutral-200 rounded-lg px-3 py-1.5 bg-white text-neutral-700 placeholder-neutral-400 focus:outline-none focus:border-[#c9a84c] transition"
+                className="w-full text-xs border border-navy-border rounded-lg px-3 py-1.5 bg-navy text-cream placeholder-neutral-600 focus:outline-none focus:border-[#c9a84c] transition"
               />
             </div>
           </div>

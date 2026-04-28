@@ -319,7 +319,7 @@ function EstimateApprovalInner() {
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-3xl mx-auto px-6 py-5 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight">AllTec Plumbing, Electrical &amp; HVAC</h1>
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight">AllTec Plumbing, Electrical &amp; HVAC LLC</h1>
             <p className="text-xs text-gray-500">Professional Home Services</p>
           </div>
           <div className="text-right">
@@ -380,7 +380,7 @@ function EstimateApprovalInner() {
         {/* Footer */}
         <div className="text-center pt-4 pb-10">
           <p className="text-xs text-gray-400">
-            Questions? Call us or reply to the email you received.
+            Questions? Call (318) 245-9810 or reply to the email you received.
           </p>
         </div>
       </main>
