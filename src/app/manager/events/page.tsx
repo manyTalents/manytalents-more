@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getAuth } from "@/lib/frappe";
+import { getFeatureFlags } from "@/lib/features";
 import {
   type MTMEvent,
   type EventCategory,
@@ -99,6 +100,7 @@ export default function EventsPage() {
       router.replace("/manager");
       return;
     }
+    if (!getFeatureFlags().events) { router.replace("/manager/dashboard"); return; }
   }, [router]);
 
   // Filters

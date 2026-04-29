@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getAuth } from "@/lib/frappe";
+import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
 import {
   fetchAllReceipts,
@@ -2901,6 +2902,7 @@ export default function InventoryPage() {
       router.replace("/manager");
       return;
     }
+    if (!getFeatureFlags().inventory) { router.replace("/manager/dashboard"); return; }
     // Fetch summary for badge counts
     import("@/lib/inventory-api").then(({ fetchInventorySummary, fetchPullSummary, fetchUnmatchedItems }) => {
       fetchInventorySummary()

@@ -11,6 +11,7 @@ import {
   type EstimateDetail,
   type EstimateOption,
 } from "@/lib/frappe";
+import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
 
 // ── Constants ──────────────────────────────────────────────
@@ -150,6 +151,7 @@ export default function EstimateDetailPage() {
       router.replace("/manager");
       return;
     }
+    if (!getFeatureFlags().estimates) { router.replace("/manager/dashboard"); return; }
     getEstimateDetail(estimateName)
       .then((data) => {
         setEstimate(data);

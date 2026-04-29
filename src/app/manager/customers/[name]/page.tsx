@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { getAuth, getCustomerProfile, type CustomerProfile } from "@/lib/frappe";
+import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -49,6 +50,7 @@ export default function CustomerProfilePage() {
       router.replace("/manager");
       return;
     }
+    if (!getFeatureFlags().customers) { router.replace("/manager/dashboard"); return; }
     getCustomerProfile(customerName)
       .then(setProfile)
       .catch((err: any) => setError(err.message || "Failed to load customer"))

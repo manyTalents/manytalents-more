@@ -3,6 +3,7 @@
 import React, { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getAuth, getARAging, resendInvoice, type ARBucket, type ARInvoice } from "@/lib/frappe";
+import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
 
 const BUCKET_LABELS = ["0-30", "31-60", "61-90", "91+"];
@@ -21,6 +22,7 @@ function InvoicesInner() {
   useEffect(() => {
     const auth = getAuth();
     if (!auth) { router.push("/manager"); return; }
+    if (!getFeatureFlags().invoicing) { router.replace("/manager/dashboard"); return; }
     getARAging()
       .then((res) => setBuckets(res.buckets))
       .catch(() => {})

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { clearAuth, globalSearch, type SearchResult } from "@/lib/frappe";
+import { getFeatureFlags, fetchFeatureFlags, FLAG_TO_NAV } from "@/lib/features";
 import EventBadge from "./EventBadge";
 import EventPanel from "./EventPanel";
 
@@ -38,6 +39,9 @@ export default function NavBar() {
   const pathname = usePathname();
   const [eventPanelOpen, setEventPanelOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [flags, setFlags] = useState(getFeatureFlags());
+
+  useEffect(() => { fetchFeatureFlags().then(setFlags).catch(() => {}); }, []);
 
   // Search state
   const [search, setSearch] = useState("");
@@ -110,19 +114,26 @@ export default function NavBar() {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-1 flex-1 justify-center">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                  isActive(link.href)
-                    ? "bg-gold-dark/20 text-gold"
-                    : "text-neutral-400 hover:text-cream hover:bg-white/5"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {(() => {
+              const visibleLinks = NAV_LINKS.filter((link) => {
+                const flagKey = FLAG_TO_NAV[link.href];
+                if (!flagKey) return true;
+                return flags[flagKey];
+              });
+              return visibleLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                    isActive(link.href)
+                      ? "bg-gold-dark/20 text-gold"
+                      : "text-neutral-400 hover:text-cream hover:bg-white/5"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ));
+            })()}
           </div>
 
           {/* Right side */}
@@ -133,7 +144,7 @@ export default function NavBar() {
             >
               + New Job
             </Link>
-            <EventBadge onClick={() => setEventPanelOpen(true)} />
+            {flags.events && <EventBadge onClick={() => setEventPanelOpen(true)} />}
             <button
               onClick={handleLogout}
               className="text-sm text-neutral-500 hover:text-red-400 transition hidden sm:inline px-2 py-1"
@@ -213,7 +224,11 @@ export default function NavBar() {
         {/* Mobile menu */}
         {mobileOpen && (
           <div className="md:hidden border-t border-navy-border bg-navy-surface px-4 py-3 space-y-1">
-            {NAV_LINKS.map((link) => (
+            {NAV_LINKS.filter((link) => {
+              const flagKey = FLAG_TO_NAV[link.href];
+              if (!flagKey) return true;
+              return flags[flagKey];
+            }).map((link) => (
               <Link
                 key={link.href}
                 href={link.href}

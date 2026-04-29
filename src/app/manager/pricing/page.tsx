@@ -12,6 +12,7 @@ import {
   type UpdatePricingResponse,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
+import { getFeatureFlags } from "@/lib/features";
 
 // ─────────────────────────────────────────────────────────────
 // EditableCell — inline-editable number cell
@@ -165,7 +166,9 @@ export default function PricingPage() {
   useEffect(() => {
     if (!getAuth()) {
       router.replace("/manager");
+      return;
     }
+    if (!getFeatureFlags().pricebook) { router.replace("/manager/dashboard"); return; }
   }, [router]);
 
   // ── Fetch data ──

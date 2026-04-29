@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getAuth, getPlanTemplates, type PlanTemplate } from "@/lib/frappe";
+import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
 
 // ── Helpers ────────────────────────────────────────────────
@@ -81,6 +82,7 @@ export default function ServicePlanTemplatesPage() {
       router.replace("/manager");
       return;
     }
+    if (!getFeatureFlags().service_plans) { router.replace("/manager/dashboard"); return; }
     getPlanTemplates()
       .then((res) => setTemplates(res.templates || []))
       .catch((err: any) => setError(err.message || "Failed to load templates"))

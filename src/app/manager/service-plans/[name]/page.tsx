@@ -12,6 +12,7 @@ import {
   type PlanDetail,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
+import { getFeatureFlags } from "@/lib/features";
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ export default function ServicePlanDetailPage() {
       router.replace("/manager");
       return;
     }
+    if (!getFeatureFlags().service_plans) { router.replace("/manager/dashboard"); return; }
     loadPlan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planName, router]);

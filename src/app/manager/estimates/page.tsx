@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getAuth, getEstimateList, type EstimateSummary } from "@/lib/frappe";
+import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
 
 const STATUS_FILTERS = ["all", "Draft", "Sent", "Approved", "Declined", "Expired"] as const;
@@ -49,6 +50,7 @@ export default function EstimatesPage() {
   // Auth guard
   useEffect(() => {
     if (!getAuth()) { router.replace("/manager"); return; }
+    if (!getFeatureFlags().estimates) { router.replace("/manager/dashboard"); return; }
   }, [router]);
 
   const fetchEstimates = useCallback(async (filter: StatusFilter, pg: number, append: boolean) => {

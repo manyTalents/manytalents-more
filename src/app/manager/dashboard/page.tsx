@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getAuth, getWorkflowCounts, type WorkflowCounts } from "@/lib/frappe";
+import { getFeatureFlags, fetchFeatureFlags, type FeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
 import ARAgingWidget from "./widgets/ARAgingWidget";
 import JobRevenueWidget from "./widgets/JobRevenueWidget";
@@ -71,6 +72,7 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
   const [countError, setCountError] = useState(false);
+  const [flags, setFlags] = useState<FeatureFlags>(getFeatureFlags());
 
   const STATUS_COLORS: Record<string, string> = {
     Entered: "bg-neutral-700 text-neutral-300",
@@ -90,6 +92,7 @@ export default function DashboardPage() {
       router.replace("/manager");
       return;
     }
+    fetchFeatureFlags().then(setFlags).catch(() => {});
     getWorkflowCounts()
       .then(setCounts)
       .catch((err) => {
@@ -125,7 +128,7 @@ export default function DashboardPage() {
 
         {/* Pipeline cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {PIPELINE.map((card) => (
+          {(flags.invoicing ? PIPELINE : []).map((card) => (
             <Link
               key={card.key}
               href={card.href}
@@ -160,15 +163,17 @@ export default function DashboardPage() {
 
         {/* Dashboard Widgets */}
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="lg:col-span-2">
-            <ARAgingWidget />
-          </div>
+          {flags.invoicing && (
+            <div className="lg:col-span-2">
+              <ARAgingWidget />
+            </div>
+          )}
           <JobRevenueWidget />
           <TeamLeaderboardWidget />
           <JobCountWidget />
-          <NeedsCheckWidget />
-          <NeedEstimateWidget />
-          <ServicePlansDueWidget />
+          {flags.invoicing && <NeedsCheckWidget />}
+          {flags.estimates && <NeedEstimateWidget />}
+          {flags.service_plans && <ServicePlansDueWidget />}
           <div className="lg:col-span-2">
             <JobsImagesWidget />
           </div>

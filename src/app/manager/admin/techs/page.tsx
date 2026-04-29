@@ -12,6 +12,7 @@ import {
   type OnboardTechResponse,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
+import { getFeatureFlags } from "@/lib/features";
 
 type PersonRole = "lead_tech" | "helper" | "office" | "office_field";
 
@@ -81,6 +82,7 @@ export default function TeamPage() {
 
   useEffect(() => {
     if (!getAuth()) { router.replace("/manager"); return; }
+    if (!getFeatureFlags().team) { router.replace("/manager/dashboard"); return; }
     loadTechs();
   }, [router]);
 

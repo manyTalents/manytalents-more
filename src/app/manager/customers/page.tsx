@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getAuth, getCustomerList, type CustomerListItem } from "@/lib/frappe";
+import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
 
 const fmtCurrency = (n: number) =>
@@ -34,6 +35,7 @@ export default function CustomersPage() {
       router.replace("/manager");
       return;
     }
+    if (!getFeatureFlags().customers) { router.replace("/manager/dashboard"); return; }
   }, [router]);
 
   const fetchCustomers = useCallback(async (query: string, pg: number, append: boolean) => {

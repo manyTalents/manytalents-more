@@ -14,6 +14,7 @@ import {
   type PlanTemplate,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
+import { getFeatureFlags } from "@/lib/features";
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -312,6 +313,7 @@ export default function ServicePlansPage() {
   // Auth guard
   useEffect(() => {
     if (!getAuth()) { router.replace("/manager"); return; }
+    if (!getFeatureFlags().service_plans) { router.replace("/manager/dashboard"); return; }
   }, [router]);
 
   // Load templates once
