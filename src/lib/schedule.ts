@@ -1,6 +1,6 @@
 import { callMethod } from "@/lib/frappe";
 
-const API = "hcp_replacement.hcp_replacement.api.schedule_utils";
+const API = "hcp_replacement.hcp_replacement.api.tech_utils";
 
 export interface ScheduleTech {
   user_id: string;
