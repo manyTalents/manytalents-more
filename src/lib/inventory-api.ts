@@ -71,6 +71,7 @@ export interface ReceiptRow {
   parsed_total: number;
   item_count: number;
   status: ReceiptStatus;
+  receipt_file: string;
 }
 
 export interface ReceiptsResponse {

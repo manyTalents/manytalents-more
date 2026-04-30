@@ -731,6 +731,23 @@ function ReceiptsTab() {
                 <p className="font-bold text-[#c9a84c] font-mono">{fmt$$(r.parsed_total || 0)}</p>
               </div>
 
+              {/* Receipt image link */}
+              {r.receipt_file && (
+                <a
+                  href={`${process.env.NEXT_PUBLIC_FRAPPE_SITE || "https://manytalentsmore.v.frappe.cloud"}${r.receipt_file}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 text-neutral-500 hover:text-[#c9a84c] transition"
+                  title="View receipt image"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+                    <circle cx="9" cy="9" r="2"/>
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+                  </svg>
+                </a>
+              )}
+
               {/* Dispatch button */}
               <button
                 onClick={() => openDispatch(r.name)}
