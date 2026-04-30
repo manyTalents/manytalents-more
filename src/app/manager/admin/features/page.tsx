@@ -20,6 +20,7 @@ const FLAG_LABELS: { key: keyof FeatureFlags; label: string; description: string
   { key: "pricebook", label: "Pricebook", description: "Pricing / pricebook management page" },
   { key: "team", label: "Team", description: "Team / technician onboarding and management page" },
   { key: "events", label: "Events", description: "Events page and event badge in the nav bar" },
+  { key: "scheduling", label: "Scheduling", description: "Schedule board — assign techs to jobs by day" },
 ];
 
 export default function FeatureFlagsPage() {

@@ -13,12 +13,13 @@ export interface FeatureFlags {
   team: boolean;
   pricebook: boolean;
   events: boolean;
+  scheduling: boolean;
 }
 
 const ALL_OFF: FeatureFlags = {
   inventory: false, estimates: false, service_plans: false,
   invoicing: false, customers: false, team: false,
-  pricebook: false, events: false,
+  pricebook: false, events: false, scheduling: false,
 };
 
 export async function fetchFeatureFlags(): Promise<FeatureFlags> {
@@ -60,4 +61,5 @@ export const FLAG_TO_NAV: Record<string, keyof FeatureFlags> = {
   "/manager/service-plans": "service_plans",
   "/manager/inventory": "inventory",
   "/manager/admin/techs": "team",
+  "/manager/schedule": "scheduling",
 };
