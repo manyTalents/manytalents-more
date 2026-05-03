@@ -112,7 +112,8 @@ function OptionsPage() {
   const [teaserRecs, setTeaserRecs] = useState<TeaserRecommendation[]>([])
   const [fullRecs, setFullRecs] = useState<Recommendation[]>([])
   const [positions, setPositions] = useState<Position[]>([])
-  const [macroSummary, setMacroSummary] = useState<string | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [macroSummary, setMacroSummary] = useState<any>(null)
   const [hasAccess, setHasAccess] = useState(false)
   const [accessTier, setAccessTier] = useState(0)
 
