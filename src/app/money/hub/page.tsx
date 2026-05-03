@@ -115,6 +115,36 @@ export default function HubPage() {
         </h2>
       </div>
 
+      {/* Options CTA */}
+      <Link
+        href="/money/options"
+        className="group relative block mb-8 overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-r from-gold/5 via-navy-card to-gold/5 p-5 hover:border-gold/50 hover:shadow-[0_0_20px_rgba(212,175,55,0.1)] transition-all"
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gold/[0.03] to-transparent animate-pulse pointer-events-none" />
+        <div className="relative flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <p className="text-xs font-bold uppercase tracking-widest text-gold">
+                Live — AI Options Finder
+              </p>
+            </div>
+            <p className="text-lg font-serif font-bold text-cream">
+              4 agents analyze. You trade the edge.
+            </p>
+            <p className="text-sm text-neutral-400 mt-1">
+              Daily ranked plays with defined risk — highest conviction first
+            </p>
+          </div>
+          <span className="hidden sm:flex items-center gap-1 px-4 py-2 rounded-xl bg-gold/10 border border-gold/20 text-gold text-sm font-bold group-hover:bg-gold/20 group-hover:translate-x-0.5 transition-all">
+            See Picks
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </span>
+        </div>
+      </Link>
+
       {/* Errors */}
       {errors.length > 0 && (
         <div className="bg-red-950/40 border border-red-900/60 rounded-lg p-4 mb-6">
