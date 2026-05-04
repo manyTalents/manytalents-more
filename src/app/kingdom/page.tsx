@@ -182,6 +182,21 @@ export default function KingdomPage() {
           </div>
         </div>
 
+        {/* ── Audio Testimony ── */}
+        <div className="k-audio">
+          <h3>Hear It From Jonathan</h3>
+          <p className="k-audio-desc">
+            Jonathan shares his full story &mdash; how he was called, what
+            he found in Cameroon, and what the Lord is doing through this
+            mission.
+          </p>
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio controls preload="metadata" className="k-audio-player">
+            <source src="/kingdom/jonathan-testimony.mp3" type="audio/mp4" />
+            Your browser does not support the audio element.
+          </audio>
+        </div>
+
         {/* ── Needs ── */}
         <div className="k-needs">
           <h3>What&apos;s Needed Right Now</h3>
@@ -562,6 +577,36 @@ const KINGDOM_CSS = `
   }
   .k-letter-sidebar strong {
     color: #fff;
+  }
+
+  /* ── Audio ── */
+  .k-audio {
+    text-align: center;
+    margin-bottom: 4rem;
+    padding: 2.5rem 2rem;
+    background: linear-gradient(180deg, rgba(201,168,76,0.04) 0%, transparent 100%);
+    border: 1px solid rgba(201,168,76,0.1);
+    border-radius: 14px;
+  }
+  .k-audio h3 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #f0ebe0;
+    margin-bottom: 0.75rem;
+  }
+  .k-audio-desc {
+    color: #8a8578;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    max-width: 480px;
+    margin: 0 auto 1.5rem;
+  }
+  .k-audio-player {
+    width: 100%;
+    max-width: 500px;
+    border-radius: 40px;
+    filter: sepia(20%) saturate(70%) brightness(90%);
   }
 
   /* ── Needs ── */
