@@ -101,10 +101,17 @@ export const crypto = {
       cached: false,
     };
   },
-  equity: async (_days = 90): Promise<CryptoEquityPoint[]> => {
-    const d = await machineDashboard();
-    const gridPnl = d.strategies?.grid?.daily_pnl || 0;
-    return [{ timestamp: new Date().toISOString(), equity: (d.equity || 0) + gridPnl }];
+  equity: async (days = 90): Promise<CryptoEquityPoint[]> => {
+    try {
+      const res = await fetchJSON<{ points: CryptoEquityPoint[] }>(
+        `${BASE}/machine/api/v1/equity?days=${days}`
+      );
+      return res.points || [];
+    } catch {
+      const d = await machineDashboard();
+      const gridPnl = d.strategies?.grid?.daily_pnl || 0;
+      return [{ timestamp: new Date().toISOString(), equity: (d.equity || 0) + gridPnl }];
+    }
   },
   positions: async (): Promise<CryptoPosition[]> => {
     const d = await machineDashboard();
@@ -200,26 +207,30 @@ export const crypto = {
     };
   },
   stats: async (): Promise<CryptoStats> => {
-    const d = await machineDashboard();
-    const fills = await machineTrades();
-    const gridPnl = d.strategies?.grid?.daily_pnl || 0;
-    const totalTrades = fills.length;
-    const wins = fills.filter((f: any) => (f.cycle_pnl || 0) > 0).length;
-    const totalPnl = fills.reduce((sum: number, f: any) => sum + (f.cycle_pnl || 0), 0);
-    const startingEquity = 436.55;
-    const currentEquity = (d.equity || 0) + gridPnl;
-    return {
-      total_return_pct: startingEquity > 0 ? ((currentEquity - startingEquity) / startingEquity) * 100 : 0,
-      total_trades: totalTrades,
-      win_rate: totalTrades > 0 ? (wins / totalTrades) * 100 : 0,
-      total_pnl: totalPnl,
-      total_fees: 0,
-      avg_win: wins > 0 ? fills.filter((f: any) => (f.cycle_pnl || 0) > 0).reduce((s: number, f: any) => s + f.cycle_pnl, 0) / wins : 0,
-      avg_loss: 0,
-      starting_equity: startingEquity,
-      current_equity: currentEquity,
-      monthly_returns: [],
-    };
+    try {
+      return await fetchJSON<CryptoStats>(`${BASE}/machine/api/v1/stats`);
+    } catch {
+      const d = await machineDashboard();
+      const fills = await machineTrades();
+      const gridPnl = d.strategies?.grid?.daily_pnl || 0;
+      const totalTrades = fills.length;
+      const wins = fills.filter((f: any) => (f.cycle_pnl || 0) > 0).length;
+      const totalPnl = fills.reduce((sum: number, f: any) => sum + (f.cycle_pnl || 0), 0);
+      const startingEquity = 436.55;
+      const currentEquity = (d.equity || 0) + gridPnl;
+      return {
+        total_return_pct: startingEquity > 0 ? ((currentEquity - startingEquity) / startingEquity) * 100 : 0,
+        total_trades: totalTrades,
+        win_rate: totalTrades > 0 ? (wins / totalTrades) * 100 : 0,
+        total_pnl: totalPnl,
+        total_fees: 0,
+        avg_win: wins > 0 ? fills.filter((f: any) => (f.cycle_pnl || 0) > 0).reduce((s: number, f: any) => s + f.cycle_pnl, 0) / wins : 0,
+        avg_loss: 0,
+        starting_equity: startingEquity,
+        current_equity: currentEquity,
+        monthly_returns: [],
+      };
+    }
   },
   learning: async (): Promise<CryptoLearning> => ({
     learner_active: false, confidence: "N/A",
