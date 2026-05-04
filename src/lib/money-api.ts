@@ -91,9 +91,16 @@ export const crypto = {
       cached: false,
     };
   },
-  equity: async (_days = 90): Promise<CryptoEquityPoint[]> => {
-    const d = await machineDashboard();
-    return [{ timestamp: new Date().toISOString(), equity: d.equity || 0 }];
+  equity: async (days = 90): Promise<CryptoEquityPoint[]> => {
+    try {
+      const res = await fetchJSON<{ points: CryptoEquityPoint[] }>(
+        `${BASE}/machine/api/v1/equity?days=${days}`
+      );
+      return res.points || [];
+    } catch {
+      const d = await machineDashboard();
+      return [{ timestamp: new Date().toISOString(), equity: d.equity || 0 }];
+    }
   },
   positions: async (): Promise<CryptoPosition[]> => {
     const d = await machineDashboard();
@@ -158,12 +165,18 @@ export const crypto = {
       },
     };
   },
-  stats: async (): Promise<CryptoStats> => ({
-    total_return_pct: 0, total_trades: 0, win_rate: 0,
-    total_pnl: 0, total_fees: 0, avg_win: 0, avg_loss: 0,
-    starting_equity: 338.47, current_equity: 338.47,
-    monthly_returns: [],
-  }),
+  stats: async (): Promise<CryptoStats> => {
+    try {
+      return await fetchJSON<CryptoStats>(`${BASE}/machine/api/v1/stats`);
+    } catch {
+      return {
+        total_return_pct: 0, total_trades: 0, win_rate: 0,
+        total_pnl: 0, total_fees: 0, avg_win: 0, avg_loss: 0,
+        starting_equity: 338.47, current_equity: 338.47,
+        monthly_returns: [],
+      };
+    }
+  },
   learning: async (): Promise<CryptoLearning> => ({
     learner_active: false, confidence: "N/A",
     lesson_count: 0, bootstrap_count: 0, live_count: 0,
