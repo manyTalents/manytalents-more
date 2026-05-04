@@ -128,8 +128,36 @@ export default function LandingPage() {
             </span>
           </Link>
 
+          <Link href="/kingdom" className="product-card">
+            <div className="card-number">05</div>
+            <h3 className="card-title">
+              God&apos;s <span className="gold">Kingdom</span>
+            </h3>
+            <p className="card-tagline">Give. Pray. Multiply.</p>
+            <p className="card-description">
+              Supporting missionaries and Kingdom-building work around the
+              world. Meet the people on the ground, see what they need, and
+              find ways to give &mdash; because multiplying talents was never
+              just about us.
+            </p>
+            <span className="card-link">
+              Support the Kingdom
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </span>
+          </Link>
+
           <a href="https://github.com/manyTalents/manytalentsmore-framework" target="_blank" rel="noopener noreferrer" className="product-card">
-            <div className="card-number">04</div>
+            <div className="card-number">06</div>
             <h3 className="card-title">
               Build Your Own <span className="gold">AI Team</span>
             </h3>
