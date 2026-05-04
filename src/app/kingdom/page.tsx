@@ -3,7 +3,6 @@
  * Broader page for featuring mission causes. Jonathan Uncapher (Cameroon) is the first.
  */
 
-import Image from "next/image";
 import KingdomContactForm from "./contact-form";
 
 export const metadata = {
@@ -92,19 +91,95 @@ export default function KingdomPage() {
           </div>
         </div>
 
-        {/* ── Photo ── */}
-        <div className="k-photo-strip">
-          <Image
-            src="/kingdom/mission-letter.jpg"
-            alt="Jonathan Uncapher's mission in Cameroon — letter with photos of the village and family"
-            width={800}
-            height={500}
-            className="k-photo"
-          />
-          <p className="k-photo-caption">
-            Jonathan&apos;s letter from the field &mdash; with photos of the
-            village and his family in Cameroon.
-          </p>
+        {/* ── Digitized Letter ── */}
+        <div className="k-letter">
+          <div className="k-letter-header">
+            <div className="k-letter-name">Jonathan Uncapher</div>
+            <div className="k-letter-contact">
+              jonathan.uncapher@gmail.com
+            </div>
+          </div>
+
+          <div className="k-letter-body">
+            <p className="k-letter-greeting">Dear Friend,</p>
+
+            <p>
+              Someone once told me: &ldquo;The Gospel is free, but sharing it
+              costs a lot of money.&rdquo;
+            </p>
+
+            <p>
+              That&apos;s true. That&apos;s why fundraising is such an important
+              part of my work.
+            </p>
+
+            <p>
+              I am a missionary in the village of Nomedjoh, Cameroon, Africa. My
+              position is Director of Development for the mission. It is my task
+              to facilitate and direct the construction of a new hospital campus,
+              a high school/technical school, and to develop a local economy to
+              make the mission self-supporting and self-propagating within five
+              years.
+            </p>
+
+            <p>
+              It was late in life when the Lord called me into this ministry
+              full-time. For many years I was the pastor of a small church in
+              Alabama, and also owned and operated a home construction company.
+              During those years I made many trips to Cameroon, actually trying
+              to accomplish from a distance the same thing I&apos;m doing now in
+              person. We had limited success.
+            </p>
+
+            <p>
+              Then everything changed. My wife, who seemed to be in excellent
+              health, suddenly died. In my time of grief and aloneness, the Lord
+              made it clear that I was to go out as a full-time missionary. So,
+              after a period of struggle, I went.
+            </p>
+
+            <p>
+              In the village, the Lord provided me a house to live in and a wife
+              and adopted family. My wife is a fellow missionary and the director
+              of the hospital laboratory. She is a beautiful and wonderful woman
+              of great faith.
+            </p>
+
+            <p>
+              Our work on the hospital building is at a standstill right now
+              because of lack of funds. We need $12,000 to complete the walls and
+              floors of 5,000 square foot building.
+            </p>
+
+            <p>
+              We have a shipping container loaded with items to help build and
+              equip the hospital, including a track loader for excavation
+              purposes, tools and supplies, and the x-ray machines essential for
+              proper medical care. The container is presently stuck in the port
+              of Kribi, Cameroon until we raise the money for the very large
+              import tax. We needed an additional $13,000. As of April 30, $5,500
+              has come in, so we still need $7,500.
+            </p>
+
+            <p>So what am I asking from you?</p>
+
+            <p>
+              Simple enough. Just do whatever the Lord puts on your heart. Pray
+              for this cause with authority. Tell others about this wonderful
+              opportunity to help Our Lord&apos;s impoverished servants. Give to
+              this mission yourself as He impresses it upon your heart.
+            </p>
+
+            <div className="k-letter-closing">
+              <p>In Our Lord Christ,</p>
+              <p className="k-letter-signature">Jonathan Uncapher</p>
+            </div>
+          </div>
+
+          <div className="k-letter-sidebar">
+            I am telling the story of our mission via daily Facebook posts under
+            my name &mdash; <strong>Jonathan Uncapher</strong>
+          </div>
         </div>
 
         {/* ── Needs ── */}
@@ -402,24 +477,91 @@ const KINGDOM_CSS = `
     font-weight: 500;
   }
 
-  /* ── Photo Strip ── */
-  .k-photo-strip {
+  /* ── Digitized Letter ── */
+  .k-letter {
+    position: relative;
+    background: linear-gradient(170deg, #f7f3eb 0%, #efe9dd 40%, #e8e0d0 100%);
+    border-radius: 6px;
+    padding: 0;
     margin-bottom: 4rem;
-    text-align: center;
+    box-shadow:
+      0 2px 8px rgba(0,0,0,0.15),
+      0 12px 40px rgba(0,0,0,0.2),
+      inset 0 1px 0 rgba(255,255,255,0.5);
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto 1fr;
   }
-  .k-photo {
-    width: 100%;
-    max-width: 700px;
-    height: auto;
-    border-radius: 14px;
-    border: 1px solid rgba(201,168,76,0.12);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  .k-letter-header {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, #4a7c3f 0%, #5a9a4a 100%);
+    padding: 1.25rem 2.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 3px solid #3d6b33;
   }
-  .k-photo-caption {
-    color: #5a5548;
-    font-size: 0.8rem;
-    margin-top: 1rem;
+  .k-letter-name {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.01em;
+  }
+  .k-letter-contact {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.85);
+    text-align: right;
+  }
+  .k-letter-body {
+    padding: 2.5rem 2.5rem 2rem;
+    color: #2c2a25;
+    font-size: 0.88rem;
+    line-height: 1.8;
+  }
+  .k-letter-body p {
+    margin-bottom: 0.9rem;
+    color: #3a3630;
+  }
+  .k-letter-greeting {
     font-style: italic;
+    color: #4a7c3f !important;
+    font-weight: 600;
+    margin-bottom: 1.1rem !important;
+  }
+  .k-letter-closing {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(74,124,63,0.15);
+  }
+  .k-letter-closing p {
+    margin-bottom: 0.25rem;
+    color: #3a3630;
+  }
+  .k-letter-signature {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.3rem;
+    font-weight: 800;
+    font-style: italic;
+    color: #4a7c3f !important;
+    margin-top: 0.25rem;
+  }
+  .k-letter-sidebar {
+    grid-row: 2;
+    background: linear-gradient(180deg, #d4a017 0%, #c49315 100%);
+    color: #fff;
+    padding: 1.5rem 1.25rem;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    max-width: 160px;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    border-left: 1px solid rgba(0,0,0,0.1);
+  }
+  .k-letter-sidebar strong {
+    color: #fff;
   }
 
   /* ── Needs ── */
@@ -657,6 +799,16 @@ const KINGDOM_CSS = `
     .k-contact-form { flex-direction: column; }
     .k-cause { padding: 2rem 1.25rem 3rem; }
     .k-hero { padding: 4rem 1.25rem 2rem; min-height: 45vh; }
+    .k-letter { grid-template-columns: 1fr; }
+    .k-letter-sidebar {
+      grid-row: auto;
+      max-width: none;
+      border-left: none;
+      border-top: 1px solid rgba(0,0,0,0.1);
+    }
+    .k-letter-body { padding: 1.75rem 1.5rem 1.5rem; }
+    .k-letter-header { padding: 1rem 1.5rem; flex-direction: column; gap: 0.25rem; text-align: center; }
+    .k-letter-contact { text-align: center; }
     .k-pullquote { font-size: 1.15rem; padding: 1.25rem 1rem; }
     .k-pullquote-closing { padding: 1.5rem; }
     .k-chapter { padding: 1.5rem; }
