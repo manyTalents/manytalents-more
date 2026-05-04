@@ -4,6 +4,7 @@
  */
 
 import Image from "next/image";
+import KingdomContactForm from "./contact-form";
 
 export const metadata = {
   title: "Supporting God's Kingdom — ManyTalents More",
@@ -199,22 +200,7 @@ export default function KingdomPage() {
           Leave your email and we&apos;ll put you in touch with Jonathan or
           share updates about Kingdom-building opportunities.
         </p>
-        <form
-          className="k-contact-form"
-          action={`mailto:jonathan.uncapher@gmail.com?subject=${encodeURIComponent("Kingdom Support Inquiry — ManyTalents More")}`}
-          method="GET"
-        >
-          <input
-            type="email"
-            name="body"
-            placeholder="your@email.com"
-            required
-            className="k-email-input"
-          />
-          <button type="submit" className="k-submit-btn">
-            Reach Out
-          </button>
-        </form>
+        <KingdomContactForm />
       </section>
 
       {/* ── Footer ── */}
@@ -632,6 +618,19 @@ const KINGDOM_CSS = `
     background: linear-gradient(135deg, #e2c873, #c9a84c);
     transform: translateY(-1px);
     box-shadow: 0 4px 16px rgba(201,168,76,0.3);
+  }
+
+  .k-success-msg {
+    color: #5db56e;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .k-error-msg {
+    color: #d45d5d;
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+    width: 100%;
+    text-align: center;
   }
 
   /* ── Footer ── */
