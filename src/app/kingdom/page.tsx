@@ -190,7 +190,6 @@ export default function KingdomPage() {
             he found in Cameroon, and what the Lord is doing through this
             mission.
           </p>
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <audio controls preload="metadata" className="k-audio-player">
             <source src="/kingdom/jonathan-testimony.mp3" type="audio/mp4" />
             Your browser does not support the audio element.
