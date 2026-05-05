@@ -191,9 +191,17 @@ export default function KingdomPage() {
             mission.
           </p>
           <audio controls preload="metadata" className="k-audio-player">
-            <source src="/kingdom/jonathan-testimony.mp3" type="audio/mp4" />
+            <source src="/kingdom/jonathan-testimony.mp3" type="audio/mpeg" />
             Your browser does not support the audio element.
           </audio>
+          <a
+            href="/kingdom/jonathan-testimony-transcript.txt"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="k-transcript-link"
+          >
+            Read the full transcript
+          </a>
         </div>
 
         {/* ── Needs ── */}
@@ -606,6 +614,21 @@ const KINGDOM_CSS = `
     max-width: 500px;
     border-radius: 40px;
     filter: sepia(20%) saturate(70%) brightness(90%);
+  }
+  .k-transcript-link {
+    display: inline-block;
+    margin-top: 1.25rem;
+    color: #c9a84c;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(201,168,76,0.3);
+    padding-bottom: 2px;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .k-transcript-link:hover {
+    color: #e2c873;
+    border-color: #e2c873;
   }
 
   /* ── Needs ── */
