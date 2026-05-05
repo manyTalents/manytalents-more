@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { createServiceClient } from "@/lib/supabase";
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY!);
@@ -13,11 +14,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Valid email required" }, { status: 400 });
     }
 
+    // Save to Supabase
+    const supabase = createServiceClient();
+    const { error: dbError } = await supabase
+      .from("kingdom_contacts")
+      .insert({ email });
+
+    if (dbError) {
+      console.error("Kingdom DB insert error:", dbError);
+    }
+
+    // Email Jonathan directly
     await getResend().emails.send({
-      from: "Kingdom Support <onboarding@resend.dev>",
-      to: "Christoph3reverding@gmail.com",
-      subject: "Kingdom Support Inquiry — ManyTalents More",
-      text: `Someone wants to connect about supporting God's Kingdom.\n\nTheir email: ${email}\n\nThis came from manytalentsmore.com/kingdom`,
+      from: "ManyTalents More <onboarding@resend.dev>",
+      to: "jonathan.uncapher@gmail.com",
+      subject: "Someone Wants to Support Your Mission",
+      text: [
+        "Jonathan,",
+        "",
+        "Someone visited manytalentsmore.com/kingdom and wants to connect about supporting your mission in Cameroon.",
+        "",
+        `Their email: ${email}`,
+        "",
+        "You can reply directly to them at that address.",
+        "",
+        "God bless,",
+        "— Sent via ManyTalents More",
+      ].join("\n"),
     });
 
     return NextResponse.json({ ok: true });
