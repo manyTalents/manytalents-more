@@ -78,14 +78,24 @@ async function machineDashboard(): Promise<any> {
   return fetchJSON<any>(`${BASE}/machine/api/v1/dashboard`);
 }
 
+async function machineTrades(): Promise<any[]> {
+  try {
+    return await fetchJSON<any[]>(`${BASE}/machine/api/v1/trades`);
+  } catch {
+    return [];
+  }
+}
+
 export const crypto = {
   balance: async (): Promise<CryptoBalance> => {
     const d = await machineDashboard();
+    const gridPnl = d.strategies?.grid?.daily_pnl || 0;
+    const equity = (d.equity || 0) + gridPnl;
     return {
-      total_usd: d.equity || 0,
-      cash_usd: 0,
-      cash_usdc: d.equity || 0,
-      inventory_usd: 0,
+      total_usd: equity,
+      cash_usd: d.equity || 0,
+      cash_usdc: 0,
+      inventory_usd: gridPnl,
       timestamp: new Date().toISOString(),
       source: "the-machine",
       cached: false,
@@ -93,40 +103,70 @@ export const crypto = {
   },
   equity: async (_days = 90): Promise<CryptoEquityPoint[]> => {
     const d = await machineDashboard();
-    return [{ timestamp: new Date().toISOString(), equity: d.equity || 0 }];
+    const gridPnl = d.strategies?.grid?.daily_pnl || 0;
+    return [{ timestamp: new Date().toISOString(), equity: (d.equity || 0) + gridPnl }];
   },
   positions: async (): Promise<CryptoPosition[]> => {
     const d = await machineDashboard();
-    return (d.positions || []).map((p: any, i: number) => ({
+    const grid = d.strategies?.grid;
+    if (!grid?.instances) return [];
+    return grid.instances.map((inst: any, i: number) => ({
       id: i,
-      pair: p.instrument || "",
-      side: p.side || "",
-      entry_price: p.entry_price || 0,
-      quote_size: (p.entry_price || 0) * (p.quantity || 0),
-      current_price: p.entry_price || 0,
-      unrealized_pnl: p.unrealized_pnl || 0,
-      strategy: p.strategy || "",
+      pair: inst.instrument || "",
+      side: "GRID",
+      entry_price: 0,
+      quote_size: inst.daily_pnl || 0,
+      current_price: 0,
+      unrealized_pnl: inst.daily_pnl || 0,
+      strategy: "grid",
       entry_fee: 0,
-      strategy_name: p.strategy || "",
+      strategy_name: `Grid (${inst.active_levels} levels)`,
     }));
   },
-  trades: async (): Promise<CryptoTrade[]> => [],
+  trades: async (): Promise<CryptoTrade[]> => {
+    const fills = await machineTrades();
+    return fills.map((f: any, i: number) => ({
+      id: f.id || i,
+      pair: f.instrument || "",
+      side: f.entry_side || "buy",
+      strategy: "grid",
+      strategy_name: "Adaptive Grid",
+      entry_price: f.entry_price || 0,
+      exit_price: f.counter_price || 0,
+      quote_size: f.entry_price || 0,
+      base_size: 1,
+      pnl: f.cycle_pnl || 0,
+      pnl_pct: f.entry_price > 0 ? ((f.cycle_pnl || 0) / f.entry_price) * 100 : 0,
+      entry_time: f.entry_time || "",
+      exit_time: f.entry_time || "",
+      entry_fee: 0,
+      exit_fee: 0,
+      maker_taker: "maker",
+      exit_reason: "grid_cycle",
+    }));
+  },
   strategies: async (): Promise<CryptoStrategy[]> => {
     const d = await machineDashboard();
     const strats = d.strategies || {};
-    return Object.entries(strats).map(([name, s]: [string, any], i) => ({
-      id: i,
-      name,
-      display_name: name.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()),
-      description: "",
-      status: s.paused ? "paused" : "active",
-      capital_allocation_pct: typeof s.allocation === "number" ? s.allocation * 100 : 0,
-      total_trades: 0,
-      wins: 0,
-      total_pnl: s.daily_pnl || 0,
-      win_rate: 0,
-      live_status: s.paused ? `paused: ${s.pause_reason || ""}` : "running",
-    }));
+    const fills = await machineTrades();
+    const gridFillCount = fills.length;
+    const gridWins = fills.filter((f: any) => (f.cycle_pnl || 0) > 0).length;
+    return Object.entries(strats).map(([name, s]: [string, any], i) => {
+      const isGrid = name === "grid";
+      return {
+        id: i,
+        name,
+        display_name: name.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()),
+        description: "",
+        status: s.paused ? "paused" : "active",
+        capital_allocation_pct: typeof s.allocation === "number" ? Math.round(s.allocation * 100) : 0,
+        total_trades: isGrid ? gridFillCount : 0,
+        wins: isGrid ? gridWins : 0,
+        total_pnl: s.daily_pnl || 0,
+        win_rate: isGrid && gridFillCount > 0 ? Math.round((gridWins / gridFillCount) * 100) : 0,
+        live_status: s.paused ? `paused: ${s.pause_reason || ""}` : "running",
+      };
+    });
   },
   signals: async (): Promise<CryptoSignals> => ({
     fear_greed: { value: 0, label: "N/A", date: "", trend: "", action: "wait" },
@@ -138,32 +178,49 @@ export const crypto = {
   risk: async (): Promise<CryptoRisk> => {
     const d = await machineDashboard();
     const r = d.risk || {};
+    const gridPnl = d.strategies?.grid?.daily_pnl || 0;
+    const equity = (d.equity || 0) + gridPnl;
+    const peak = Math.max(r.monthly_high_water || 0, equity);
     return {
-      current_equity: r.daily_open_equity || 0,
-      peak_equity: r.monthly_high_water || 0,
-      drawdown_pct: r.monthly_high_water > 0
-        ? ((r.monthly_high_water - r.daily_open_equity) / r.monthly_high_water) * 100
-        : 0,
+      current_equity: equity,
+      peak_equity: peak,
+      drawdown_pct: peak > 0 ? ((peak - equity) / peak) * 100 : 0,
       drawdown_tier: r.is_killed ? "KILLED" : "normal",
-      positions_open: (d.positions || []).length,
+      positions_open: d.strategies?.grid?.instances?.length || 0,
       positions_max: 10,
       cash_reserve_pct: 20,
       cash_reserve_ok: true,
-      today_pnl: 0,
-      today_pnl_pct: 0,
+      today_pnl: gridPnl,
+      today_pnl_pct: d.equity > 0 ? (gridPnl / d.equity) * 100 : 0,
       circuit_breakers: {
-        daily_limit: { threshold: 5, current: 0, tripped: false },
+        daily_limit: { threshold: 5, current: d.equity > 0 ? (gridPnl / d.equity) * 100 : 0, tripped: false },
         weekly_limit: { threshold: 10, current: 0, tripped: r.weekly_paused || false },
         monthly_limit: { threshold: 20, current: 0, tripped: r.monthly_paused || false },
       },
     };
   },
-  stats: async (): Promise<CryptoStats> => ({
-    total_return_pct: 0, total_trades: 0, win_rate: 0,
-    total_pnl: 0, total_fees: 0, avg_win: 0, avg_loss: 0,
-    starting_equity: 338.47, current_equity: 338.47,
-    monthly_returns: [],
-  }),
+  stats: async (): Promise<CryptoStats> => {
+    const d = await machineDashboard();
+    const fills = await machineTrades();
+    const gridPnl = d.strategies?.grid?.daily_pnl || 0;
+    const totalTrades = fills.length;
+    const wins = fills.filter((f: any) => (f.cycle_pnl || 0) > 0).length;
+    const totalPnl = fills.reduce((sum: number, f: any) => sum + (f.cycle_pnl || 0), 0);
+    const startingEquity = 436.55;
+    const currentEquity = (d.equity || 0) + gridPnl;
+    return {
+      total_return_pct: startingEquity > 0 ? ((currentEquity - startingEquity) / startingEquity) * 100 : 0,
+      total_trades: totalTrades,
+      win_rate: totalTrades > 0 ? (wins / totalTrades) * 100 : 0,
+      total_pnl: totalPnl,
+      total_fees: 0,
+      avg_win: wins > 0 ? fills.filter((f: any) => (f.cycle_pnl || 0) > 0).reduce((s: number, f: any) => s + f.cycle_pnl, 0) / wins : 0,
+      avg_loss: 0,
+      starting_equity: startingEquity,
+      current_equity: currentEquity,
+      monthly_returns: [],
+    };
+  },
   learning: async (): Promise<CryptoLearning> => ({
     learner_active: false, confidence: "N/A",
     lesson_count: 0, bootstrap_count: 0, live_count: 0,

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY!);
+}
 
 export async function POST(req: Request) {
   try {
@@ -11,7 +13,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Valid email required" }, { status: 400 });
     }
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: "Kingdom Support <onboarding@resend.dev>",
       to: "Christoph3reverding@gmail.com",
       subject: "Kingdom Support Inquiry — ManyTalents More",
