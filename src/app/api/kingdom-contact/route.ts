@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     // Email Jonathan directly
     await getResend().emails.send({
-      from: "ManyTalents More <onboarding@resend.dev>",
+      from: "ManyTalents More <kingdom@manytalentsmore.com>",
       to: "jonathan.uncapher@gmail.com",
       subject: "Someone Wants to Support Your Mission",
       text: [
