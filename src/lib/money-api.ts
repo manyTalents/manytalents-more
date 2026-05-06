@@ -40,8 +40,13 @@ function headers(): Record<string, string> {
   };
 }
 
-async function fetchJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: headers() });
+async function fetchJSON<T>(url: string, useAuth = true): Promise<T> {
+  const h: Record<string, string> = { Accept: "application/json" };
+  if (useAuth) {
+    const auth = getMoneyAuth();
+    if (auth) h.Authorization = `Bearer ${auth.token}`;
+  }
+  const res = await fetch(url, { headers: h });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
@@ -75,12 +80,12 @@ export const veoe = {
 // Maps The Machine's /api/v1/dashboard to the existing frontend types.
 
 async function machineDashboard(): Promise<any> {
-  return fetchJSON<any>(`${BASE}/machine/api/v1/dashboard`);
+  return fetchJSON<any>(`${BASE}/machine/api/v1/dashboard`, false);
 }
 
 async function machineTrades(): Promise<any[]> {
   try {
-    return await fetchJSON<any[]>(`${BASE}/machine/api/v1/trades`);
+    return await fetchJSON<any[]>(`${BASE}/machine/api/v1/trades`, false);
   } catch {
     return [];
   }
