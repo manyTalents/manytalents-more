@@ -3,6 +3,7 @@
  * Broader page for featuring mission causes. Jonathan Uncapher (Cameroon) is the first.
  */
 
+import Link from "next/link";
 import KingdomContactForm from "./contact-form";
 
 export const metadata = {
@@ -15,6 +16,13 @@ export default function KingdomPage() {
   return (
     <>
       <style>{KINGDOM_CSS}</style>
+
+      {/* ── Nav ── */}
+      <nav className="k-nav">
+        <Link href="/" className="k-nav-brand">
+          Many<span className="gold">Talents</span> More
+        </Link>
+      </nav>
 
       {/* ── Hero ── */}
       <section className="k-hero">
@@ -330,6 +338,32 @@ const KINGDOM_CSS = `
     font-weight: 600;
     margin-left: 2px;
     -webkit-text-fill-color: #5db56e;
+  }
+
+  /* ── Nav ── */
+  .k-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    padding: 1rem 2rem;
+    background: rgba(26, 24, 20, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(201,168,76,0.08);
+    font-family: 'Inter', -apple-system, sans-serif;
+  }
+  .k-nav-brand {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #f0ebe0;
+    text-decoration: none;
+    transition: opacity 0.2s;
+  }
+  .k-nav-brand:hover {
+    opacity: 0.8;
   }
 
   /* ── Hero ── */
