@@ -56,7 +56,7 @@ export async function updateJobSchedule(params: {
   end_time?: string;
   tech_user?: string;
 }) {
-  return callMethod(`${API}.update_job_schedule`, params);
+  return callMethod(`${SS_API}_update_job_schedule`, params);
 }
 
 export async function createTimeOff(params: {
