@@ -1,6 +1,8 @@
 import { callMethod } from "@/lib/frappe";
 
 const API = "hcp_replacement.hcp_replacement.api.tech_utils";
+// Server Script endpoints (bypass FC worker cache)
+const SS_API = "mtm";
 
 export interface ScheduleTech {
   user_id: string;
@@ -44,7 +46,7 @@ export interface ScheduleBoardData {
 }
 
 export async function fetchScheduleBoard(weekStart: string): Promise<ScheduleBoardData> {
-  return callMethod<ScheduleBoardData>(`${API}.get_schedule_board`, { week_start: weekStart });
+  return callMethod<ScheduleBoardData>(`${SS_API}_get_schedule_board`, { week_start: weekStart });
 }
 
 export async function updateJobSchedule(params: {
