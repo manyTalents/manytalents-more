@@ -24,7 +24,7 @@ const ALL_OFF: FeatureFlags = {
 
 export async function fetchFeatureFlags(): Promise<FeatureFlags> {
   try {
-    const flags = await callMethod<FeatureFlags>(`${API}.get_feature_flags`);
+    const flags = await callMethod<FeatureFlags>("mtm_get_feature_flags");
     if (typeof window !== "undefined") {
       localStorage.setItem(CACHE_KEY, JSON.stringify({ flags, ts: Date.now() }));
     }
