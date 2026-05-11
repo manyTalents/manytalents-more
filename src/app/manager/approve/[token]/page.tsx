@@ -223,9 +223,11 @@ function ApprovePageInner() {
     <div className="min-h-screen flex items-center justify-center p-8">
       <div className="max-w-lg w-full">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-serif font-extrabold mb-1">
-            Many<span className="text-gold-gradient">Talents</span> Manager
-          </h1>
+          <a href="/" className="block">
+            <h1 className="text-2xl font-serif font-extrabold mb-1">
+              Many<span className="text-gold-gradient">Talents</span> Manager
+            </h1>
+          </a>
           <p className="text-neutral-400 text-sm">Access Request Review</p>
         </div>
 

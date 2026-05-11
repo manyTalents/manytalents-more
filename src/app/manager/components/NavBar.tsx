@@ -107,7 +107,7 @@ export default function NavBar() {
       <nav aria-label="Main navigation" className="border-b border-navy-border bg-navy-surface/80 backdrop-blur-xl sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           {/* Brand */}
-          <Link href="/manager/dashboard" className="flex items-center gap-2 flex-shrink-0">
+          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
             <h1 className="text-lg font-serif font-extrabold">
               Many<span className="text-gold-gradient">Talents</span>
             </h1>

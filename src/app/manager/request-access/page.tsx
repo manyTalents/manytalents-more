@@ -43,9 +43,11 @@ export default function RequestAccessPage() {
     <div className="min-h-screen flex items-center justify-center p-8">
       <div className="max-w-md w-full">
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-serif font-extrabold mb-2">
-            Many<span className="text-gold-gradient">Talents</span> Manager
-          </h1>
+          <a href="/" className="block">
+            <h1 className="text-3xl font-serif font-extrabold mb-2">
+              Many<span className="text-gold-gradient">Talents</span> Manager
+            </h1>
+          </a>
           <p className="text-neutral-400 text-sm tracking-wider uppercase">
             Request Access
           </p>

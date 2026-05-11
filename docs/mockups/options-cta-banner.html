@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Options CTA Banner — Mockup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { bg: '#0a0f1a', surface: '#111827', card: '#1a2234', border: '#2a3548' },
+            gold: { DEFAULT: '#d4af37', dark: '#b8961f', light: '#e6c744' },
+            cream: '#f5f0e8',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  </style>
+</head>
+<body class="bg-navy-bg min-h-screen p-8">
+  <div class="max-w-4xl mx-auto">
+    <!-- Header (context) -->
+    <div class="mb-8">
+      <p class="text-xs uppercase tracking-widest text-gold mb-2">Portfolio Overview</p>
+      <h2 class="text-3xl font-serif font-extrabold text-cream">Grow what's entrusted.</h2>
+    </div>
+
+    <!-- === THE CTA BANNER === -->
+    <a
+      href="#"
+      class="group relative block mb-8 overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-r from-gold/5 via-navy-card to-gold/5 p-5 hover:border-gold/50 hover:shadow-[0_0_20px_rgba(212,175,55,0.1)] transition-all"
+    >
+      <div class="absolute inset-0 bg-gradient-to-r from-transparent via-gold/[0.03] to-transparent animate-pulse pointer-events-none"></div>
+      <div class="relative flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <p class="text-xs font-bold uppercase tracking-widest text-gold">
+              Live — AI Options Advisor
+            </p>
+          </div>
+          <p class="text-lg font-serif font-bold text-cream">
+            4 agents analyze. You trade the edge.
+          </p>
+          <p class="text-sm text-neutral-400 mt-1">
+            Daily ranked plays with defined risk — highest conviction first
+          </p>
+        </div>
+        <span class="hidden sm:flex items-center gap-1 px-4 py-2 rounded-xl bg-gold/10 border border-gold/20 text-gold text-sm font-bold group-hover:bg-gold/20 group-hover:translate-x-0.5 transition-all">
+          See Picks
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </span>
+      </div>
+    </a>
+    <!-- === END CTA === -->
+
+    <!-- Below: Portfolio metrics (context) -->
+    <div class="grid grid-cols-3 gap-4 mb-8">
+      <div class="bg-navy-surface border border-navy-border rounded-xl p-4">
+        <p class="text-xs text-neutral-500 mb-1">Total Portfolio</p>
+        <p class="text-xl font-mono font-bold text-cream">$1,247.83</p>
+      </div>
+      <div class="bg-navy-surface border border-navy-border rounded-xl p-4">
+        <p class="text-xs text-neutral-500 mb-1">Total P&L</p>
+        <p class="text-xl font-mono font-bold text-emerald-400">+$83.21</p>
+      </div>
+      <div class="bg-navy-surface border border-navy-border rounded-xl p-4">
+        <p class="text-xs text-neutral-500 mb-1">Active Strategies</p>
+        <p class="text-xl font-bold text-cream">2</p>
+        <p class="text-xs text-neutral-500">VEOE + The Machine</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

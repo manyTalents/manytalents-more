@@ -24,7 +24,7 @@ export default function MoneyNav() {
     <nav className="border-b border-navy-border bg-navy-surface/80 backdrop-blur-xl sticky top-0 z-10">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <Link href="/money/hub" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <h1 className="text-xl font-serif font-extrabold">
               Many<span className="text-gold-gradient">Talents</span> Money
             </h1>
