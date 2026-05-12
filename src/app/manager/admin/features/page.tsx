@@ -47,7 +47,7 @@ export default function FeatureFlagsPage() {
       await callMethod("frappe.client.set_value", {
         doctype: "MTM Feature Flags",
         name: "MTM Feature Flags",
-        fieldname: key,
+        fieldname: `enable_${key}`,
         value: newValue ? 1 : 0,
       });
       const updated = { ...flags, [key]: newValue };
