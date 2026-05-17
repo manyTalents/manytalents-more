@@ -59,6 +59,7 @@ export function getFeatureFlags(): FeatureFlags {
 
 export function clearFeatureFlags() {
   if (typeof window !== "undefined") localStorage.removeItem(CACHE_KEY);
+  lastFetchError = 0;
 }
 
 export const FLAG_TO_NAV: Record<string, keyof FeatureFlags> = {

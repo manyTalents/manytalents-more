@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { clearAuth, globalSearch, type SearchResult } from "@/lib/frappe";
+import { clearFeatureFlags } from "@/lib/features";
 import { getFeatureFlags, fetchFeatureFlags, FLAG_TO_NAV } from "@/lib/features";
 import EventBadge from "./EventBadge";
 import EventPanel from "./EventPanel";
@@ -53,6 +54,7 @@ export default function NavBar() {
   const searchRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
+    clearFeatureFlags();
     clearAuth();
     router.replace("/manager");
   };
