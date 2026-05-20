@@ -79,6 +79,16 @@ const DESTINATIONS: ItemDestination[] = [
   "Lost",
 ];
 
+const TRUCKS = [
+  "Chris's Truck",
+  "Warrens Truck",
+  "Adam's Truck",
+  "Tim's Truck",
+  "Glen's Truck",
+  "Dereck's Truck",
+  "Matt's Truck",
+];
+
 const PAGE_SIZE = 25;
 
 // ──────────────────────────────────────────────
@@ -116,12 +126,13 @@ function matchColor(score: number): string {
 
 interface DestButtonsProps {
   current: ItemDestination;
+  currentTruck?: string;
   hasJob: boolean;
-  onSelect: (d: ItemDestination) => void;
+  onSelect: (d: ItemDestination, truck?: string) => void;
   disabled?: boolean;
 }
 
-function DestButtons({ current, hasJob, onSelect, disabled }: DestButtonsProps) {
+function DestButtons({ current, currentTruck, hasJob, onSelect, disabled }: DestButtonsProps) {
   const [truckOpen, setTruckOpen] = useState(false);
 
   return (
@@ -142,15 +153,19 @@ function DestButtons({ current, hasJob, onSelect, disabled }: DestButtonsProps) 
                     : "bg-[#1a1f32] text-neutral-400 hover:text-white hover:bg-[#1e2540]"
                   } disabled:opacity-40`}
               >
-                Truck {truckOpen ? "▲" : "▾"}
+                {active && currentTruck ? currentTruck.replace("'s Truck", "").replace(" Truck", "") : "Truck"} {truckOpen ? "▲" : "▾"}
               </button>
               {truckOpen && (
-                <div className="absolute top-full left-0 mt-1 z-20 bg-[#0d1120] border border-[#1a1f32] rounded-lg shadow-xl min-w-[140px]">
-                  {["My Truck", "Other Truck"].map((t) => (
+                <div className="absolute top-full left-0 mt-1 z-20 bg-[#0d1120] border border-[#1a1f32] rounded-lg shadow-xl min-w-[160px] max-h-[240px] overflow-y-auto">
+                  {TRUCKS.map((t) => (
                     <button
                       key={t}
-                      onClick={() => { onSelect("Truck"); setTruckOpen(false); }}
-                      className="block w-full text-left px-3 py-2 text-xs text-neutral-300 hover:bg-[#111627] hover:text-[#c9a84c] transition"
+                      onClick={() => { onSelect("Truck", t); setTruckOpen(false); }}
+                      className={`block w-full text-left px-3 py-2 text-xs transition
+                        ${currentTruck === t
+                          ? "text-[#c9a84c] bg-[#111627]"
+                          : "text-neutral-300 hover:bg-[#111627] hover:text-[#c9a84c]"
+                        }`}
                     >
                       {t}
                     </button>
@@ -231,6 +246,7 @@ function DispatchView({ receiptName, onBack }: DispatchViewProps) {
   const [error, setError] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [dests, setDests] = useState<Record<string, ItemDestination>>({});
+  const [truckDests, setTruckDests] = useState<Record<string, string>>({});
   const [sending, setSending] = useState<Record<string, boolean>>({});
   const [sent, setSent] = useState<Record<string, boolean>>({});
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -271,11 +287,17 @@ function DispatchView({ receiptName, onBack }: DispatchViewProps) {
 
   const handleSendOne = async (item: ReceiptItem) => {
     if (!detail) return;
+    const dest = dests[item.name] || "Limbo";
+    if (dest === "Truck" && !truckDests[item.name]) {
+      showToast("Select which truck first.");
+      return;
+    }
     setSending((s) => ({ ...s, [item.name]: true }));
     try {
       const payload: DispatchItemInput[] = [{
         item_name: item.name,
-        destination: dests[item.name] || "Limbo",
+        destination: dest,
+        ...(dest === "Truck" && truckDests[item.name] ? { target_warehouse: truckDests[item.name] } : {}),
       }];
       await dispatchItems(detail.hcp_job || "", payload);
       setSent((s) => ({ ...s, [item.name]: true }));
@@ -313,6 +335,7 @@ function DispatchView({ receiptName, onBack }: DispatchViewProps) {
       const payload: DispatchItemInput[] = checkedItems.map((it) => ({
         item_name: it.name,
         destination: dests[it.name],
+        ...(dests[it.name] === "Truck" && truckDests[it.name] ? { target_warehouse: truckDests[it.name] } : {}),
       }));
       if (payload.length === 0) {
         showToast("No non-Limbo checked items to sync.");
@@ -515,7 +538,11 @@ function DispatchView({ receiptName, onBack }: DispatchViewProps) {
                       <DestButtons
                         current={dests[item.name] || "Limbo"}
                         hasJob={hasJob}
-                        onSelect={(d) => setDests((prev) => ({ ...prev, [item.name]: d }))}
+                        currentTruck={truckDests[item.name]}
+                        onSelect={(d, truck) => {
+                          setDests((prev) => ({ ...prev, [item.name]: d }));
+                          if (truck) setTruckDests((prev) => ({ ...prev, [item.name]: truck }));
+                        }}
                         disabled={!!sent[item.name]}
                       />
                     </td>
@@ -566,8 +593,12 @@ function DispatchView({ receiptName, onBack }: DispatchViewProps) {
               <div className="mb-3">
                 <DestButtons
                   current={dests[item.name] || "Limbo"}
+                  currentTruck={truckDests[item.name]}
                   hasJob={hasJob}
-                  onSelect={(d) => setDests((prev) => ({ ...prev, [item.name]: d }))}
+                  onSelect={(d, truck) => {
+                    setDests((prev) => ({ ...prev, [item.name]: d }));
+                    if (truck) setTruckDests((prev) => ({ ...prev, [item.name]: truck }));
+                  }}
                   disabled={!!sent[item.name]}
                 />
               </div>
@@ -1086,6 +1117,7 @@ function LimboTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dests, setDests] = useState<Record<string, ItemDestination>>({});
+  const [truckDests, setTruckDests] = useState<Record<string, string>>({});
   const [sending, setSending] = useState<Record<string, boolean>>({});
   const [sent, setSent] = useState<Record<string, boolean>>({});
   const [toast, setToast] = useState("");
@@ -1112,11 +1144,17 @@ function LimboTab() {
   }, []);
 
   const handleSend = async (item: ReceiptItem, jobName: string) => {
+    const dest = dests[item.name] || "Limbo";
+    if (dest === "Truck" && !truckDests[item.name]) {
+      showToast("Select which truck first.");
+      return;
+    }
     setSending((s) => ({ ...s, [item.name]: true }));
     try {
       await dispatchItems(jobName || "", [{
         item_name: item.name,
-        destination: dests[item.name] || "Limbo",
+        destination: dest,
+        ...(dest === "Truck" && truckDests[item.name] ? { target_warehouse: truckDests[item.name] } : {}),
       }]);
       setSent((s) => ({ ...s, [item.name]: true }));
       showToast("Dispatched.");
@@ -1209,8 +1247,12 @@ function LimboTab() {
                   <div className="flex-shrink-0">
                     <DestButtons
                       current={dests[item.name] || "Limbo"}
+                      currentTruck={truckDests[item.name]}
                       hasJob={!!group.hcp_job}
-                      onSelect={(d) => setDests((prev) => ({ ...prev, [item.name]: d }))}
+                      onSelect={(d, truck) => {
+                        setDests((prev) => ({ ...prev, [item.name]: d }));
+                        if (truck) setTruckDests((prev) => ({ ...prev, [item.name]: truck }));
+                      }}
                       disabled={!!sent[item.name]}
                     />
                   </div>
