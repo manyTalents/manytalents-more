@@ -17,7 +17,7 @@ interface PublicEstimate {
 
 // ── Helpers ────────────────────────────────────────────────
 
-const SITE = process.env.NEXT_PUBLIC_FRAPPE_SITE || "https://manytalentsmore.v.frappe.cloud";
+const SITE = process.env.NEXT_PUBLIC_FRAPPE_SITE || "https://erp.manytalentsmore.com";
 
 async function loadPublicEstimate(token: string): Promise<PublicEstimate> {
   const res = await fetch(`${SITE.replace(/\/+$/, "")}/api/method/hcp_replacement.hcp_replacement.api.estimates.get_estimate_by_token`, {

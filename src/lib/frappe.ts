@@ -3,7 +3,7 @@
  * Uses fetch + token auth. Credentials stored in browser localStorage.
  */
 
-const SITE = process.env.NEXT_PUBLIC_FRAPPE_SITE || "https://manytalentsmore.v.frappe.cloud";
+const SITE = process.env.NEXT_PUBLIC_FRAPPE_SITE || "https://erp.manytalentsmore.com";
 
 export interface AuthCreds {
   siteUrl: string;

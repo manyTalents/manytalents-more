@@ -18,7 +18,7 @@ import type { ReceiptItem } from "@/lib/inventory-api";
 // ──────────────────────────────────────────────
 
 const FRAPPE_SITE =
-  process.env.NEXT_PUBLIC_FRAPPE_SITE || "https://manytalentsmore.v.frappe.cloud";
+  process.env.NEXT_PUBLIC_FRAPPE_SITE || "https://erp.manytalentsmore.com";
 
 function receiptUrl(receiptFile: string): string {
   if (!receiptFile) return "";

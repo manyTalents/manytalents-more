@@ -30,7 +30,7 @@ function LoginPageInner() {
   const searchParams = useSearchParams();
 
   // Manual login state
-  const [siteUrl, setSiteUrl] = useState("https://manytalentsmore.v.frappe.cloud");
+  const [siteUrl, setSiteUrl] = useState("https://erp.manytalentsmore.com");
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
   const [testing, setTesting] = useState(false);
@@ -56,7 +56,7 @@ function LoginPageInner() {
       redeemInvite(token)
         .then((creds) => {
           setAuth({
-            siteUrl: creds.site_url || "https://manytalentsmore.v.frappe.cloud",
+            siteUrl: creds.site_url || "https://erp.manytalentsmore.com",
             apiKey: creds.api_key,
             apiSecret: creds.api_secret,
           });

@@ -13,7 +13,7 @@ interface JobImage {
   uploaded_at: string;
 }
 
-const SITE = process.env.NEXT_PUBLIC_FRAPPE_SITE || "https://manytalentsmore.v.frappe.cloud";
+const SITE = process.env.NEXT_PUBLIC_FRAPPE_SITE || "https://erp.manytalentsmore.com";
 const MAX_IMAGES = 12;
 
 export default function JobsImagesWidget() {

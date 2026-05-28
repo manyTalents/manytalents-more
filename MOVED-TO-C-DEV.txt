@@ -1,0 +1,14 @@
+============================================================
+  THIS PROJECT HAS BEEN MOVED
+============================================================
+
+  New location:  C:\Dev\ManyTalentsMore
+
+  Why: OneDrive file-locking was causing builds to hang
+  and node_modules to corrupt. Local disk = instant builds.
+
+  Date moved: 2026-04-22
+
+  This folder is safe to delete once you've confirmed
+  the new location works.
+============================================================

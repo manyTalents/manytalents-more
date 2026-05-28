@@ -234,7 +234,7 @@ export default function JobDetailPage() {
       const res = await action(jobName);
       if (res?.sales_invoice) {
         const creds = getAuth();
-        const siteUrl = creds?.siteUrl || "https://manytalentsmore.v.frappe.cloud";
+        const siteUrl = creds?.siteUrl || "https://erp.manytalentsmore.com";
         setInvoiceInfo({
           name: res.sales_invoice,
           url: `${siteUrl}/app/sales-invoice/${res.sales_invoice}`,
