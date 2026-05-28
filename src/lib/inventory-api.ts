@@ -104,6 +104,7 @@ export interface ReceiptDetail {
   hcp_job: string;
   hcp_job_id: string;
   parsed_total: number;
+  receipt_file: string;
   items: ReceiptItem[];
   dispatch_summary: DispatchSummary;
 }
@@ -215,6 +216,7 @@ export interface LimboGroup {
   supplier: string;
   hcp_job: string;
   hcp_job_id: string;
+  receipt_file?: string;
   items: ReceiptItem[];
 }
 

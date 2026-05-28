@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getAuth } from "@/lib/frappe";
 import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
+import { ReceiptThumbnail } from "@/app/manager/inventory/ReceiptImageViewer";
 import {
   fetchAllReceipts,
   fetchReceiptDetail,
@@ -410,7 +411,7 @@ function DispatchView({ receiptName, onBack }: DispatchViewProps) {
           </div>
         </div>
 
-        {/* Meta */}
+        {/* Meta + receipt thumbnail */}
         <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-400">
           <span className="font-bold text-[#c9a84c]">{fmt$$(detail.parsed_total)}</span>
           {detail.buyer_name && (
@@ -425,6 +426,13 @@ function DispatchView({ receiptName, onBack }: DispatchViewProps) {
           {detail.hcp_job_id && (
             <span className="text-[#c9a84c] font-mono text-xs">#{detail.hcp_job_id}</span>
           )}
+          {/* Receipt image thumbnail — opens compare overlay */}
+          <ReceiptThumbnail
+            receiptFile={detail.receipt_file}
+            items={detail.items}
+            supplier={detail.supplier}
+            receiptName={receiptName}
+          />
         </div>
       </div>
 
@@ -762,22 +770,13 @@ function ReceiptsTab() {
                 <p className="font-bold text-[#c9a84c] font-mono">{fmt$$(r.parsed_total || 0)}</p>
               </div>
 
-              {/* Receipt image link */}
-              {r.receipt_file && (
-                <a
-                  href={`${process.env.NEXT_PUBLIC_FRAPPE_SITE || "https://manytalentsmore.v.frappe.cloud"}${r.receipt_file}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 text-neutral-500 hover:text-[#c9a84c] transition"
-                  title="View receipt image"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
-                    <circle cx="9" cy="9" r="2"/>
-                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
-                  </svg>
-                </a>
-              )}
+              {/* Receipt thumbnail — always shown; placeholder icon when no image */}
+              <ReceiptThumbnail
+                receiptFile={r.receipt_file}
+                items={[]}
+                supplier={r.supplier}
+                receiptName={r.name}
+              />
 
               {/* Dispatch button */}
               <button
@@ -1210,6 +1209,12 @@ function LimboTab() {
           <div key={group.receipt_name}>
             {/* Group header */}
             <div className="flex items-center gap-3 mb-3">
+              <ReceiptThumbnail
+                receiptFile={group.receipt_file}
+                items={group.items}
+                supplier={group.supplier}
+                receiptName={group.receipt_name}
+              />
               <span className="text-xs font-bold text-[#c9a84c] uppercase tracking-wider">
                 {group.supplier || group.receipt_name}
               </span>
