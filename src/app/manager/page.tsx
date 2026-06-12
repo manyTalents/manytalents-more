@@ -8,7 +8,7 @@ import {
   setAuth,
   testConnection,
   redeemInvite,
-  requestLoginLink,
+  loginWithPassword,
 } from "@/lib/frappe";
 
 export default function LoginPage() {
@@ -29,7 +29,13 @@ function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Manual login state
+  // Email + password login state
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  // Manual API key login state
   const [siteUrl, setSiteUrl] = useState("https://erp.manytalentsmore.com");
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
@@ -40,12 +46,6 @@ function LoginPageInner() {
   // Magic-link redemption state
   const [redeeming, setRedeeming] = useState(false);
   const [redeemError, setRedeemError] = useState("");
-
-  // Self-service state
-  const [linkEmail, setLinkEmail] = useState("");
-  const [linkStatus, setLinkStatus] = useState<
-    { kind: "idle" | "sending" | "sent" | "error"; message?: string; fallbackUrl?: string }
-  >({ kind: "idle" });
 
   // Auto-redeem magic link from ?invite=TOKEN
   useEffect(() => {
@@ -77,6 +77,27 @@ function LoginPageInner() {
       router.replace("/manager/dashboard");
     }
   }, [router, searchParams]);
+
+  const handlePasswordLogin = async () => {
+    if (!email.trim() || !password) {
+      setLoginError("Email and password are required");
+      return;
+    }
+    setLoggingIn(true);
+    setLoginError("");
+    try {
+      const creds = await loginWithPassword(email.trim().toLowerCase(), password);
+      setAuth({
+        siteUrl: creds.site_url || "https://erp.manytalentsmore.com",
+        apiKey: creds.api_key,
+        apiSecret: creds.api_secret,
+      });
+      router.replace("/manager/dashboard");
+    } catch (err: any) {
+      setLoginError(err.message || "Login failed");
+    }
+    setLoggingIn(false);
+  };
 
   const handleLogin = async () => {
     if (!siteUrl || !apiKey || !apiSecret) {
@@ -155,64 +176,49 @@ function LoginPageInner() {
         <div className="bg-navy-surface border border-navy-border rounded-2xl p-8">
           <h2 className="text-xl font-serif font-bold mb-6">Sign In</h2>
 
-          {/* Self-service login link form */}
-          {linkStatus.kind === "sent" ? (
-            <div className="bg-emerald-950/40 border border-emerald-900/60 rounded-lg p-5">
-              <p className="text-emerald-300 font-medium mb-1">Check your inbox</p>
-              <p className="text-emerald-300/80 text-sm">{linkStatus.message}</p>
-              <button
-                onClick={() => {
-                  setLinkEmail("");
-                  setLinkStatus({ kind: "idle" });
-                }}
-                className="mt-4 text-xs text-emerald-300/60 hover:text-emerald-300 underline"
-              >
-                Send another link
-              </button>
+          {/* Email + Password — primary login */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-neutral-400 mb-1.5">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handlePasswordLogin()}
+                placeholder="you@manytalentsmore.com"
+                autoComplete="email"
+                className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
+              />
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-neutral-400 mb-1.5">
-                  Your Email
-                </label>
-                <input
-                  type="email"
-                  value={linkEmail}
-                  onChange={(e) => setLinkEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSendLink()}
-                  placeholder="you@manytalentsmore.com"
-                  className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
-                />
-              </div>
-
-              {linkStatus.kind === "error" && (
-                <div>
-                  <p className="text-red-400 text-sm">{linkStatus.message}</p>
-                  {linkStatus.fallbackUrl && (
-                    <div className="mt-2 p-3 bg-navy border border-navy-border rounded text-xs">
-                      <p className="text-neutral-500 mb-1">Admin fallback URL:</p>
-                      <p className="text-gold font-mono break-all">{linkStatus.fallbackUrl}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <button
-                onClick={handleSendLink}
-                disabled={linkStatus.kind === "sending"}
-                className="w-full bg-gradient-to-br from-gold to-gold-dark text-navy font-bold py-3.5 rounded-lg hover:from-gold-light hover:to-gold transition disabled:opacity-60"
-              >
-                {linkStatus.kind === "sending" ? "Sending..." : "Email Me a Login Link"}
-              </button>
-
-              <p className="text-center text-xs text-neutral-500 mt-1">
-                Expires in 15 minutes · one-time use
-              </p>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-neutral-400 mb-1.5">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handlePasswordLogin()}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
+              />
             </div>
-          )}
 
-          {/* Manual login (collapsed) */}
+            {loginError && <p className="text-red-400 text-sm">{loginError}</p>}
+
+            <button
+              onClick={handlePasswordLogin}
+              disabled={loggingIn}
+              className="w-full bg-gradient-to-br from-gold to-gold-dark text-navy font-bold py-3.5 rounded-lg hover:from-gold-light hover:to-gold transition disabled:opacity-60"
+            >
+              {loggingIn ? "Signing in..." : "Sign In"}
+            </button>
+          </div>
+
+          {/* API key login (collapsed) */}
           <div className="mt-8 pt-6 border-t border-navy-border">
             {!showManual ? (
               <button
@@ -224,7 +230,7 @@ function LoginPageInner() {
             ) : (
               <div className="space-y-4">
                 <p className="text-xs uppercase tracking-wider text-neutral-400">
-                  Manual Sign In
+                  API Key Sign In
                 </p>
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">

@@ -270,6 +270,11 @@ export interface RedeemInviteResponse {
   full_name?: string;
 }
 
+/** Email + password login → returns API credentials */
+export async function loginWithPassword(email: string, password: string): Promise<RedeemInviteResponse> {
+  return await callGuestMethod<RedeemInviteResponse>(`${AUTH_API}.login_with_password`, { email, password });
+}
+
 /** Redeem a magic-link token → returns fresh API credentials */
 export async function redeemInvite(token: string): Promise<RedeemInviteResponse> {
   return await callGuestMethod<RedeemInviteResponse>(`${AUTH_API}.redeem_invite`, { token });
