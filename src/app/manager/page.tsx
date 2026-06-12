@@ -32,6 +32,7 @@ function LoginPageInner() {
   // Email + password login state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState("");
 
@@ -196,15 +197,24 @@ function LoginPageInner() {
               <label className="block text-xs uppercase tracking-wider text-neutral-400 mb-1.5">
                 Password
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handlePasswordLogin()}
-                placeholder="Enter your password"
-                autoComplete="current-password"
-                className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handlePasswordLogin()}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 pr-16 text-cream focus:outline-none focus:border-gold-dark transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gold-dark hover:text-gold transition"
+                >
+                  {showPassword ? "HIDE" : "SHOW"}
+                </button>
+              </div>
             </div>
 
             {loginError && <p className="text-red-400 text-sm">{loginError}</p>}
