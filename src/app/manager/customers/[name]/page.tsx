@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { getAuth, getCustomerProfile, type CustomerProfile } from "@/lib/frappe";
+import { getAuth, getCustomerProfile, callMethod, type CustomerProfile } from "@/lib/frappe";
 import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
 
@@ -44,6 +44,12 @@ export default function CustomerProfilePage() {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Edit state
+  const [editing, setEditing] = useState(false);
+  const [editPhone, setEditPhone] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!getAuth()) {
@@ -104,31 +110,71 @@ export default function CustomerProfilePage() {
         {/* Header card */}
         <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl font-serif font-bold text-cream">{profile.customer_name}</h1>
-              <div className="mt-2 space-y-1">
-                {profile.phone && (
-                  <a
-                    href={`tel:${profile.phone}`}
-                    className="block text-sm text-gold hover:text-gold-light transition"
+              {!editing ? (
+                <div className="mt-2 space-y-1">
+                  {profile.phone && (
+                    <a href={`tel:${profile.phone}`} className="block text-sm text-gold hover:text-gold-light transition">
+                      {profile.phone}
+                    </a>
+                  )}
+                  {profile.email && (
+                    <a href={`mailto:${profile.email}`} className="block text-sm text-neutral-400 hover:text-cream transition">
+                      {profile.email}
+                    </a>
+                  )}
+                  {createdYear && (
+                    <p className="text-xs text-neutral-500">Customer since {createdYear}</p>
+                  )}
+                  <button
+                    onClick={() => { setEditPhone(profile.phone || ""); setEditEmail(profile.email || ""); setEditing(true); }}
+                    className="text-xs text-neutral-500 hover:text-gold-light mt-2"
                   >
-                    {profile.phone}
-                  </a>
-                )}
-                {profile.email && (
-                  <a
-                    href={`mailto:${profile.email}`}
-                    className="block text-sm text-neutral-400 hover:text-cream transition"
-                  >
-                    {profile.email}
-                  </a>
-                )}
-                {createdYear && (
-                  <p className="text-xs text-neutral-500">
-                    Customer since {createdYear}
-                  </p>
-                )}
-              </div>
+                    Edit
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-3 space-y-3 max-w-sm">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-neutral-400 mb-1">Phone</label>
+                    <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)}
+                      className="w-full bg-navy border border-navy-border rounded-lg px-3 py-2 text-cream text-sm focus:border-gold-dark focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-neutral-400 mb-1">Email</label>
+                    <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)}
+                      className="w-full bg-navy border border-navy-border rounded-lg px-3 py-2 text-cream text-sm focus:border-gold-dark focus:outline-none" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={saving}
+                      onClick={async () => {
+                        setSaving(true);
+                        try {
+                          await callMethod("hcp_replacement.hcp_replacement.api.customers.update_customer_contact", {
+                            customer_name: profile.customer_name,
+                            phone: editPhone,
+                            email: editEmail,
+                          });
+                          setEditing(false);
+                          // Reload profile
+                          const updated = await getCustomerProfile(customerName);
+                          setProfile(updated);
+                        } catch (err: any) {
+                          setError(err.message || "Save failed");
+                        } finally { setSaving(false); }
+                      }}
+                      className="px-4 py-1.5 bg-gradient-to-br from-gold to-gold-dark text-navy font-bold text-xs rounded-lg"
+                    >
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                    <button onClick={() => setEditing(false)} className="px-4 py-1.5 text-xs text-neutral-400 hover:text-cream">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Create Job action */}

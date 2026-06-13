@@ -202,6 +202,10 @@ export async function updateJobServices(
   });
 }
 
+export async function saveJobField(jobName: string, field: string, value: string): Promise<any> {
+  return callMethod(`${API}.save_job_field`, { job_name: jobName, field, value });
+}
+
 export async function searchCustomers(query: string): Promise<any[]> {
   return await callMethod(`${API}.search_customers`, { query });
 }

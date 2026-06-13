@@ -15,6 +15,8 @@ import {
   updateJobServices,
   getDefaultLaborRate,
   getEstimateList,
+  addJobNote,
+  saveJobField,
   type EstimateSummary,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
@@ -137,6 +139,15 @@ export default function JobDetailPage() {
   // Send-back modal
   const [sendBackTarget, setSendBackTarget] = useState<string | null>(null);
   const [sendBackNote, setSendBackNote] = useState("");
+
+  // Editable info fields
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [infoFields, setInfoFields] = useState<Record<string, string>>({});
+  const [savingInfo, setSavingInfo] = useState(false);
+
+  // Notes
+  const [noteText, setNoteText] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   const loadJob = () => {
     setLoading(true);
@@ -275,6 +286,58 @@ export default function JobDetailPage() {
     }
   };
 
+  const startEditingInfo = () => {
+    setInfoFields({
+      customer_name: job.customer_name || "",
+      address: job.address || "",
+      town: job.town || "",
+      description: job.description || "",
+      job_type: job.job_type || "",
+      priority: job.priority || "",
+      occupant_name: job.occupant_name || "",
+      occupant_phone: job.occupant_phone || "",
+      customer_phone: job.customer_phone || "",
+    });
+    setEditingInfo(true);
+  };
+
+  const saveInfo = async () => {
+    setSavingInfo(true);
+    setError("");
+    try {
+      const EDITABLE_FIELDS = [
+        "customer_name", "address", "town", "description",
+        "job_type", "priority", "occupant_name", "occupant_phone", "customer_phone",
+      ];
+      const saves = EDITABLE_FIELDS.filter(
+        (f) => (infoFields[f] ?? "") !== (job[f] ?? "")
+      ).map((f) => saveJobField(jobName, f, infoFields[f]));
+      await Promise.all(saves);
+      setEditingInfo(false);
+      setActionResult("Job info updated");
+      loadJob();
+    } catch (err: any) {
+      setError(err.message || "Could not save job info");
+    } finally {
+      setSavingInfo(false);
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!noteText.trim()) return;
+    setSavingNote(true);
+    setError("");
+    try {
+      await addJobNote(jobName, noteText.trim());
+      setNoteText("");
+      loadJob();
+    } catch (err: any) {
+      setError(err.message || "Could not add note");
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
   const fmtCurrency = (n: number) =>
     `$${(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -393,45 +456,112 @@ export default function JobDetailPage() {
 
         {/* Job info grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Left — customer & location */}
+          {/* Left — customer & location (editable) */}
           <div className="bg-navy-surface border border-navy-border rounded-2xl p-6 space-y-4">
-            <p className="text-xs uppercase tracking-wider text-neutral-400">
-              Customer & Location
-            </p>
-            <div>
-              <p className="text-lg font-serif font-bold">
-                {job.customer_name || "Unknown"}
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-wider text-neutral-400">
+                Customer & Location
               </p>
-              {job.customer_phone && (
-                <a
-                  href={`tel:${job.customer_phone}`}
-                  className="text-sm text-gold hover:text-gold-light"
+              {!editingInfo ? (
+                <button
+                  onClick={startEditingInfo}
+                  className="text-xs text-gold hover:text-gold-light transition"
                 >
-                  {job.customer_phone}
-                </a>
+                  Edit
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setEditingInfo(false); setError(""); }}
+                    className="text-xs text-neutral-500 hover:text-cream transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveInfo}
+                    disabled={savingInfo}
+                    className="text-xs bg-gold-dark text-navy font-bold px-3 py-1 rounded transition disabled:opacity-60"
+                  >
+                    {savingInfo ? "Saving..." : "Save"}
+                  </button>
+                </div>
               )}
             </div>
-            <div>
-              <p className="text-sm text-neutral-300">
-                {job.address}
-                {job.town ? `, ${job.town}` : ""}
-              </p>
-            </div>
-            {(job.occupant_name || job.occupant_phone) && (
-              <div className="pt-3 border-t border-navy-border">
-                <p className="text-xs text-neutral-500 mb-1">Occupant</p>
-                {job.occupant_name && (
-                  <p className="text-sm text-neutral-300">{job.occupant_name}</p>
-                )}
-                {job.occupant_phone && (
-                  <a
-                    href={`tel:${job.occupant_phone}`}
-                    className="text-sm text-gold hover:text-gold-light"
-                  >
-                    {job.occupant_phone}
-                  </a>
-                )}
+
+            {editingInfo ? (
+              <div className="space-y-3">
+                {[
+                  { label: "Customer Name", field: "customer_name" },
+                  { label: "Customer Phone", field: "customer_phone" },
+                  { label: "Address", field: "address" },
+                  { label: "Town", field: "town" },
+                  { label: "Job Type", field: "job_type" },
+                  { label: "Priority", field: "priority" },
+                  { label: "Occupant Name", field: "occupant_name" },
+                  { label: "Occupant Phone", field: "occupant_phone" },
+                ].map(({ label, field }) => (
+                  <div key={field}>
+                    <label className="block text-xs text-neutral-500 mb-1">{label}</label>
+                    <input
+                      type="text"
+                      value={infoFields[field] ?? ""}
+                      onChange={(e) =>
+                        setInfoFields((prev) => ({ ...prev, [field]: e.target.value }))
+                      }
+                      className="w-full bg-navy border border-navy-border rounded px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark transition"
+                    />
+                  </div>
+                ))}
+                <div>
+                  <label className="block text-xs text-neutral-500 mb-1">Description</label>
+                  <textarea
+                    value={infoFields["description"] ?? ""}
+                    onChange={(e) =>
+                      setInfoFields((prev) => ({ ...prev, description: e.target.value }))
+                    }
+                    rows={3}
+                    className="w-full bg-navy border border-navy-border rounded px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark transition resize-none"
+                  />
+                </div>
               </div>
+            ) : (
+              <>
+                <div>
+                  <p className="text-lg font-serif font-bold">
+                    {job.customer_name || "Unknown"}
+                  </p>
+                  {job.customer_phone && (
+                    <a
+                      href={`tel:${job.customer_phone}`}
+                      className="text-sm text-gold hover:text-gold-light"
+                    >
+                      {job.customer_phone}
+                    </a>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-neutral-300">
+                    {job.address}
+                    {job.town ? `, ${job.town}` : ""}
+                  </p>
+                </div>
+                {(job.occupant_name || job.occupant_phone) && (
+                  <div className="pt-3 border-t border-navy-border">
+                    <p className="text-xs text-neutral-500 mb-1">Occupant</p>
+                    {job.occupant_name && (
+                      <p className="text-sm text-neutral-300">{job.occupant_name}</p>
+                    )}
+                    {job.occupant_phone && (
+                      <a
+                        href={`tel:${job.occupant_phone}`}
+                        className="text-sm text-gold hover:text-gold-light"
+                      >
+                        {job.occupant_phone}
+                      </a>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -476,6 +606,115 @@ export default function JobDetailPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Photos */}
+        {(() => {
+          const siteUrl = getAuth()?.siteUrl || "https://erp.manytalentsmore.com";
+          const photos: any[] = job.photos || job.attachments || [];
+          return (
+            <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+              <p className="text-xs uppercase tracking-wider text-neutral-400 mb-4">
+                Photos ({photos.length})
+              </p>
+              {photos.length === 0 ? (
+                <p className="text-neutral-500 text-sm">No photos yet.</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {photos.map((photo: any, i: number) => {
+                    const rawUrl: string = photo.file_url || photo.url || "";
+                    const fullUrl = rawUrl.startsWith("http")
+                      ? rawUrl
+                      : `${siteUrl.replace(/\/+$/, "")}${rawUrl}`;
+                    return (
+                      <a
+                        key={photo.name || i}
+                        href={fullUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block aspect-square rounded-xl overflow-hidden border border-navy-border hover:border-gold-dark transition group"
+                        aria-label={`Photo ${i + 1}`}
+                      >
+                        <img
+                          src={fullUrl}
+                          alt={`Job photo ${i + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          loading="lazy"
+                        />
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Notes */}
+        <div className="bg-navy-surface border border-navy-border rounded-2xl p-6 space-y-4">
+          <p className="text-xs uppercase tracking-wider text-neutral-400">Notes</p>
+
+          {/* Add note */}
+          <div className="flex gap-2 items-end">
+            <textarea
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Add a note..."
+              rows={2}
+              className="flex-1 bg-navy border border-navy-border rounded-lg px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark transition resize-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAddNote();
+              }}
+            />
+            <button
+              onClick={handleAddNote}
+              disabled={savingNote || !noteText.trim()}
+              className="bg-gold-dark text-navy font-bold text-sm px-4 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-40 whitespace-nowrap"
+            >
+              {savingNote ? "Saving..." : "Add Note"}
+            </button>
+          </div>
+
+          {/* Existing notes — newest first */}
+          {(() => {
+            const notes: any[] = job.job_notes || [];
+            if (notes.length === 0) {
+              return (
+                <p className="text-neutral-500 text-sm">No notes on this job yet.</p>
+              );
+            }
+            const sorted = [...notes].sort((a, b) => {
+              const ta = new Date(a.note_at || 0).getTime();
+              const tb = new Date(b.note_at || 0).getTime();
+              return tb - ta;
+            });
+            return (
+              <ul className="space-y-3">
+                {sorted.map((note: any, i: number) => (
+                  <li
+                    key={i}
+                    className="bg-navy border border-navy-border rounded-xl px-4 py-3"
+                  >
+                    <p className="text-sm text-neutral-200 leading-relaxed whitespace-pre-wrap">
+                      {note.note_text}
+                    </p>
+                    <p className="text-xs text-neutral-500 mt-2">
+                      {note.note_by || "Unknown"}
+                      {note.note_at
+                        ? ` · ${new Date(note.note_at).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}`
+                        : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            );
+          })()}
         </div>
 
         {/* Description */}
