@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import NavBar from "../components/NavBar";
 import { getAuth } from "@/lib/frappe";
-import { fetchScheduleBoard, ScheduleBoardData, getWeekStart } from "@/lib/schedule";
+import { fetchScheduleBoard, ScheduleBoardData, getWeekStart, createTimeOff } from "@/lib/schedule";
 import ScheduleGrid from "./components/ScheduleGrid";
 import UnscheduledSidebar from "./components/UnscheduledSidebar";
 
@@ -16,6 +16,11 @@ export default function SchedulePage() {
   const [showSat, setShowSat] = useState(false);
   const [showSun, setShowSun] = useState(false);
   const [projection, setProjection] = useState(false);
+  const [showTimeOff, setShowTimeOff] = useState(false);
+  const [toEmployee, setToEmployee] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [toReason, setToReason] = useState("");
+  const [toSaving, setToSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -77,6 +82,7 @@ export default function SchedulePage() {
           <div className="flex justify-between items-center mb-3">
             <h1 className="text-xl text-[#f5f0e8]" style={{ fontFamily: "'Playfair Display', serif" }}>Schedule Board</h1>
             <div className="flex items-center gap-2">
+              <button onClick={() => setShowTimeOff(true)} className="bg-[#1a2332] border border-[#2a3a4e] text-[#f5f0e8] px-3 py-1.5 rounded-lg text-xs hover:border-[#c9a84c]">+ Time Off</button>
               <button onClick={goThisWeek} className="border border-[#c9a84c] text-[#c9a84c] px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#c9a84c]/10">This Week</button>
               <button onClick={() => navigateWeek(-1)} className="bg-[#1a2332] border border-[#2a3a4e] text-[#f5f0e8] w-8 h-8 rounded-lg flex items-center justify-center hover:border-[#c9a84c]">&larr;</button>
               <div className="text-sm font-semibold text-[#f5f0e8] min-w-[180px] text-center">{weekLabel}</div>
@@ -103,6 +109,45 @@ export default function SchedulePage() {
           )}
         </div>
       </div>
+      {/* Time Off Modal */}
+      {showTimeOff && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowTimeOff(false)}>
+          <div className="bg-[#1a2332] border border-[#2a3a4e] rounded-2xl p-6 w-80" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-[#c9a84c] mb-4">Request Time Off</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-[#354a61] mb-1">Employee</label>
+                <select value={toEmployee} onChange={(e) => setToEmployee(e.target.value)}
+                  className="w-full bg-[#0f1729] border border-[#2a3a4e] rounded-lg px-3 py-2 text-[#f5f0e8] text-sm">
+                  <option value="">Select...</option>
+                  {data?.techs.map((t) => <option key={t.user_id} value={t.user_id}>{t.employee_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-[#354a61] mb-1">Date</label>
+                <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+                  className="w-full bg-[#0f1729] border border-[#2a3a4e] rounded-lg px-3 py-2 text-[#f5f0e8] text-sm" />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-[#354a61] mb-1">Reason</label>
+                <input value={toReason} onChange={(e) => setToReason(e.target.value)} placeholder="Optional"
+                  className="w-full bg-[#0f1729] border border-[#2a3a4e] rounded-lg px-3 py-2 text-[#f5f0e8] text-sm" />
+              </div>
+              <button disabled={toSaving || !toEmployee || !toDate} onClick={async () => {
+                setToSaving(true);
+                try {
+                  await createTimeOff({ employee: toEmployee, date: toDate, reason: toReason });
+                  setShowTimeOff(false); setToEmployee(""); setToDate(""); setToReason("");
+                  loadData();
+                } catch (err: any) { alert(err.message || "Failed"); }
+                setToSaving(false);
+              }} className="w-full bg-[#c9a84c] text-[#0f1729] font-bold py-2.5 rounded-lg disabled:opacity-50">
+                {toSaving ? "Submitting..." : "Submit Request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
