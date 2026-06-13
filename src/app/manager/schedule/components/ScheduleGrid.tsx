@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, Fragment } from "react";
-import { ScheduleBoardData, SchedulePuck, updateJobSchedule } from "@/lib/schedule";
+import { ScheduleBoardData, SchedulePuck, updateJobSchedule, unscheduleJob } from "@/lib/schedule";
 import Puck from "./Puck";
 import TimeOffPuck from "./TimeOffPuck";
 import TimePickerPopover from "./TimePickerPopover";
@@ -141,7 +141,11 @@ export default function ScheduleGrid({ data, weekStart, onRefresh, showSat, show
                   {cellJobs.map((job) => (
                     <Puck key={job.name} job={job}
                       onClick={() => router.push(`/manager/jobs/${job.name}`)}
-                      onDragStart={(e) => handleDragStart(e, job)} />
+                      onDragStart={(e) => handleDragStart(e, job)}
+                      onUnschedule={async (name) => {
+                        await unscheduleJob(name);
+                        onRefresh();
+                      }} />
                   ))}
                 </div>
               );

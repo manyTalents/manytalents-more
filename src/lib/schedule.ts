@@ -57,6 +57,15 @@ export async function updateJobSchedule(params: {
   return callMethod(`${API}.update_job_schedule`, params);
 }
 
+export async function unscheduleJob(jobName: string) {
+  return callMethod(`${API}.update_job_schedule`, {
+    job_name: jobName,
+    scheduled_date: "",
+    start_time: "",
+    end_time: "",
+  });
+}
+
 export async function createTimeOff(params: {
   employee: string;
   date: string;

@@ -14,9 +14,10 @@ interface PuckProps {
   onClick?: () => void;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
+  onUnschedule?: (jobName: string) => void;
 }
 
-export default function Puck({ job, onClick, draggable = true, onDragStart }: PuckProps) {
+export default function Puck({ job, onClick, draggable = true, onDragStart, onUnschedule }: PuckProps) {
   const trade = getTrade(job.job_type);
   const { border, icon } = TRADE_COLORS[trade];
   const dateStr = job.scheduled_date
@@ -41,9 +42,20 @@ export default function Puck({ job, onClick, draggable = true, onDragStart }: Pu
         <div className="text-[#f5f0e8] text-[11px] font-medium leading-tight">{dateStr}</div>
         <div className="text-[#e0c878] text-[11px] font-bold leading-tight">{timeRange}</div>
       </div>
-      <div className="text-right">
-        <span className="text-sm leading-none">{icon}</span>
-        <span className="block text-[10px] text-[#354a61] font-medium">#{job.job_number}</span>
+      <div className="text-right flex items-center gap-1 justify-end">
+        <div>
+          <span className="text-sm leading-none">{icon}</span>
+          <span className="block text-[10px] text-[#354a61] font-medium">#{job.job_number}</span>
+        </div>
+        {onUnschedule && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onUnschedule(job.name); }}
+            className="w-5 h-5 rounded-full bg-red-900/60 hover:bg-red-700 text-red-300 text-xs font-bold flex items-center justify-center flex-shrink-0"
+            title="Unschedule"
+          >
+            −
+          </button>
+        )}
       </div>
     </div>
   );
