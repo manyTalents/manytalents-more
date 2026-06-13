@@ -9,6 +9,7 @@ import {
   testConnection,
   redeemInvite,
   loginWithPassword,
+  requestPasswordReset,
 } from "@/lib/frappe";
 
 export default function LoginPage() {
@@ -35,6 +36,9 @@ function LoginPageInner() {
   const [showPassword, setShowPassword] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState("");
+
+  // Forgot password
+  const [resetStatus, setResetStatus] = useState<"idle" | "sending" | "sent">("idle");
 
   // Manual API key login state
   const [siteUrl, setSiteUrl] = useState("https://erp.manytalentsmore.com");
@@ -226,6 +230,23 @@ function LoginPageInner() {
             >
               {loggingIn ? "Signing in..." : "Sign In"}
             </button>
+
+            {resetStatus === "sent" ? (
+              <p className="text-center text-sm text-emerald-400 mt-3">Check your email for a reset link.</p>
+            ) : (
+              <button
+                onClick={async () => {
+                  if (!email.trim()) { setLoginError("Enter your email first"); return; }
+                  setResetStatus("sending");
+                  await requestPasswordReset(email.trim().toLowerCase());
+                  setResetStatus("sent");
+                }}
+                disabled={resetStatus === "sending"}
+                className="w-full text-center text-xs text-neutral-500 hover:text-gold-light transition mt-3"
+              >
+                {resetStatus === "sending" ? "Sending..." : "Forgot Password?"}
+              </button>
+            )}
           </div>
 
           {/* API key login (collapsed) */}

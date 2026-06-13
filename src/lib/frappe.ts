@@ -271,6 +271,10 @@ export interface RedeemInviteResponse {
 }
 
 /** Email + password login → returns API credentials */
+export async function requestPasswordReset(email: string): Promise<{ sent: boolean; message: string }> {
+  return await callGuestMethod<{ sent: boolean; message: string }>(`${AUTH_API}.request_password_reset`, { email });
+}
+
 export async function loginWithPassword(email: string, password: string): Promise<RedeemInviteResponse> {
   return await callGuestMethod<RedeemInviteResponse>(`${AUTH_API}.login_with_password`, { email, password });
 }
