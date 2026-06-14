@@ -26,23 +26,27 @@ function receiptUrl(receiptFile: string): string {
   return `${FRAPPE_SITE}${receiptFile}`;
 }
 
-/** Fetch a private file as a blob URL with auth headers */
-async function fetchAuthImage(receiptFile: string): Promise<string | null> {
-  if (!receiptFile) return null;
+/** Fetch receipt image via backend API (returns base64 data URL) */
+async function fetchAuthImage(receiptName: string): Promise<string | null> {
+  if (!receiptName) return null;
   try {
     const raw = typeof window !== "undefined" ? localStorage.getItem("mtm_web_auth") : null;
-    if (!raw) return receiptUrl(receiptFile); // fallback to direct URL
+    if (!raw) return null;
     const { apiKey, apiSecret } = JSON.parse(raw);
-    const url = receiptFile.startsWith("http") ? receiptFile : `${FRAPPE_SITE}${receiptFile}`;
-    const resp = await fetch(url, {
-      headers: { Authorization: `token ${apiKey}:${apiSecret}` },
+    const resp = await fetch(`${FRAPPE_SITE}/api/method/hcp_replacement.hcp_replacement.api.inventory.get_receipt_image`, {
+      method: "POST",
+      headers: {
+        Authorization: `token ${apiKey}:${apiSecret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ receipt_name: receiptName }),
     });
     if (!resp.ok) {
-      console.warn("[ReceiptImage] fetch failed:", resp.status);
+      console.warn("[ReceiptImage] API failed:", resp.status);
       return null;
     }
-    const blob = await resp.blob();
-    return URL.createObjectURL(blob);
+    const data = await resp.json();
+    return data?.message?.data_url || null;
   } catch (e: any) {
     console.warn("[ReceiptImage] error:", e.message);
     return null;
@@ -89,21 +93,12 @@ function ZoomPane({ src, alt }: ZoomPaneProps) {
   const [imgLoading, setImgLoading] = useState(true);
   const dragStart = useRef({ mx: 0, my: 0, ox: 0, oy: 0 });
 
-  // Fetch image with auth headers for private files
+  // Reset zoom/pan when src changes
   useEffect(() => {
     setScale(1);
     setOrigin({ x: 0, y: 0 });
-    setImgLoading(true);
-    setBlobSrc(null);
-    if (!src) return;
-    let cancelled = false;
-    fetchAuthImage(src).then((url) => {
-      if (!cancelled) {
-        setBlobSrc(url || src);
-        setImgLoading(false);
-      }
-    });
-    return () => { cancelled = true; };
+    setImgLoading(false);
+    setBlobSrc(src);
   }, [src]);
 
   // Scroll-wheel zoom — zoom toward cursor position
@@ -396,7 +391,23 @@ export function ReceiptCompareOverlay({
   receiptName,
   onClose,
 }: ReceiptCompareOverlayProps) {
-  const imageUrl = receiptFile ? receiptUrl(receiptFile) : null;
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imgLoading, setImgLoading] = useState(true);
+
+  useEffect(() => {
+    setImgLoading(true);
+    if (receiptName) {
+      fetchAuthImage(receiptName).then((url) => {
+        setImageUrl(url);
+        setImgLoading(false);
+      });
+    } else if (receiptFile) {
+      setImageUrl(receiptUrl(receiptFile));
+      setImgLoading(false);
+    } else {
+      setImgLoading(false);
+    }
+  }, [receiptFile, receiptName]);
 
   // Close on Escape
   useEffect(() => {
@@ -453,7 +464,11 @@ export function ReceiptCompareOverlay({
         >
           {/* On md+ the explicit heights are irrelevant — flex handles it */}
           <div className="h-full w-full" style={{ minHeight: "inherit", maxHeight: "inherit" }}>
-            {imageUrl ? (
+            {imgLoading ? (
+              <div className="h-full w-full flex items-center justify-center">
+                <div className="w-10 h-10 border-2 border-[#c9a84c] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : imageUrl ? (
               <ZoomPane src={imageUrl} alt={`Receipt from ${supplier || receiptName || "supplier"}`} />
             ) : (
               <div className="h-full w-full flex flex-col items-center justify-center text-center px-8 gap-4">
@@ -508,9 +523,12 @@ export function ReceiptThumbnail({
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!receiptFile) return;
-    fetchAuthImage(receiptFile).then(setThumbUrl);
-  }, [receiptFile]);
+    if (receiptName) {
+      fetchAuthImage(receiptName).then(setThumbUrl);
+    } else if (receiptFile) {
+      setThumbUrl(receiptUrl(receiptFile));
+    }
+  }, [receiptFile, receiptName]);
 
   return (
     <>
