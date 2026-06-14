@@ -26,6 +26,29 @@ function receiptUrl(receiptFile: string): string {
   return `${FRAPPE_SITE}${receiptFile}`;
 }
 
+/** Fetch a private file as a blob URL with auth headers */
+async function fetchAuthImage(receiptFile: string): Promise<string | null> {
+  if (!receiptFile) return null;
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem("mtm_web_auth") : null;
+    if (!raw) return receiptUrl(receiptFile); // fallback to direct URL
+    const { apiKey, apiSecret } = JSON.parse(raw);
+    const url = receiptFile.startsWith("http") ? receiptFile : `${FRAPPE_SITE}${receiptFile}`;
+    const resp = await fetch(url, {
+      headers: { Authorization: `token ${apiKey}:${apiSecret}` },
+    });
+    if (!resp.ok) {
+      console.warn("[ReceiptImage] fetch failed:", resp.status);
+      return null;
+    }
+    const blob = await resp.blob();
+    return URL.createObjectURL(blob);
+  } catch (e: any) {
+    console.warn("[ReceiptImage] error:", e.message);
+    return null;
+  }
+}
+
 function fmt$$(n: number): string {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
@@ -62,12 +85,25 @@ function ZoomPane({ src, alt }: ZoomPaneProps) {
   const [scale, setScale] = useState(1);
   const [origin, setOrigin] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const [blobSrc, setBlobSrc] = useState<string | null>(null);
+  const [imgLoading, setImgLoading] = useState(true);
   const dragStart = useRef({ mx: 0, my: 0, ox: 0, oy: 0 });
 
-  // Reset zoom/pan when src changes
+  // Fetch image with auth headers for private files
   useEffect(() => {
     setScale(1);
     setOrigin({ x: 0, y: 0 });
+    setImgLoading(true);
+    setBlobSrc(null);
+    if (!src) return;
+    let cancelled = false;
+    fetchAuthImage(src).then((url) => {
+      if (!cancelled) {
+        setBlobSrc(url || src);
+        setImgLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
   }, [src]);
 
   // Scroll-wheel zoom — zoom toward cursor position
@@ -222,9 +258,14 @@ function ZoomPane({ src, alt }: ZoomPaneProps) {
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
+        {imgLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-8 h-8 border-2 border-[#c9a84c] border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={src}
+          src={blobSrc || src}
           alt={alt}
           draggable={false}
           className="absolute top-0 left-0 max-w-none"
@@ -464,7 +505,12 @@ export function ReceiptThumbnail({
   className = "",
 }: ReceiptThumbnailProps) {
   const [open, setOpen] = useState(false);
-  const imageUrl = receiptFile ? receiptUrl(receiptFile) : null;
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!receiptFile) return;
+    fetchAuthImage(receiptFile).then(setThumbUrl);
+  }, [receiptFile]);
 
   return (
     <>
@@ -474,10 +520,10 @@ export function ReceiptThumbnail({
         title={receiptFile ? "View receipt" : "No image — view parsed items"}
         aria-label="View receipt"
       >
-        {imageUrl ? (
+        {thumbUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={imageUrl}
+            src={thumbUrl}
             alt="Receipt thumbnail"
             className="h-full w-full object-cover"
           />
