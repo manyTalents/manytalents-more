@@ -139,6 +139,18 @@ export default function FeatureFlagsPage() {
         <p className="text-xs text-neutral-600 mt-4 text-center">
           Flags are cached for 5 minutes in each browser session.
         </p>
+
+        {/* Admin links */}
+        <div className="mt-6 bg-navy-surface border border-navy-border rounded-2xl p-4">
+          <h2 className="text-xs uppercase tracking-wider text-neutral-400 font-bold mb-3">Admin Pages</h2>
+          <div className="space-y-2">
+            <a href="/manager/admin/invoice-settings" className="block text-sm text-gold hover:text-gold-light transition">Invoice Settings &amp; Clauses</a>
+            <a href="/manager/admin/techs" className="block text-sm text-gold hover:text-gold-light transition">Team Management</a>
+            <a href="/manager/admin/invite" className="block text-sm text-gold hover:text-gold-light transition">Invite User</a>
+            <a href="/manager/admin/requests" className="block text-sm text-gold hover:text-gold-light transition">Access Requests</a>
+            <a href="/manager/admin/approvers" className="block text-sm text-gold hover:text-gold-light transition">Approvers</a>
+          </div>
+        </div>
       </main>
     </div>
   );
