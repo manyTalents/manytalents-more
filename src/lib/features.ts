@@ -15,12 +15,14 @@ export interface FeatureFlags {
   pricebook: boolean;
   events: boolean;
   scheduling: boolean;
+  money: boolean;
 }
 
 const ALL_OFF: FeatureFlags = {
   inventory: false, estimates: false, service_plans: false,
   invoicing: false, customers: false, team: false,
   pricebook: false, events: false, scheduling: false,
+  money: false,
 };
 
 let lastFetchError = 0;
@@ -46,14 +48,15 @@ export function getFeatureFlags(): FeatureFlags {
   if (typeof window === "undefined") return ALL_OFF;
   try {
     const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return ALL_OFF;
+    if (!raw) return { ...ALL_OFF, money: true };
     const cached = JSON.parse(raw);
     if (Date.now() - cached.ts > CACHE_TTL && Date.now() - lastFetchError >= ERROR_COOLDOWN) {
       fetchFeatureFlags().catch(() => {});
     }
-    return cached.flags || ALL_OFF;
+    const f = cached.flags || ALL_OFF;
+    return { ...ALL_OFF, ...f, money: (f as any).money ?? true };
   } catch {
-    return ALL_OFF;
+    return { ...ALL_OFF, money: true };
   }
 }
 

@@ -5,12 +5,19 @@
  * This is a static page, no auth. Converted from the original
  * index.html to use Next.js + inline styles (to preserve the
  * custom typography/glow effects from the prep site design).
+ *
+ * Item 3 separation: Money card is feature-flagged (see lib/features).
+ * /money routes also gate via layout. Manager plumbing tools are independent.
  */
+
+"use client";
 
 import Link from "next/link";
 import Image from "next/image";
+import { getFeatureFlags } from "@/lib/features";
 
 export default function LandingPage() {
+  const flags = getFeatureFlags();
   return (
     <>
       <style>{LANDING_CSS}</style>
@@ -101,32 +108,34 @@ export default function LandingPage() {
             </span>
           </Link>
 
-          <Link href="/money" className="product-card">
-            <div className="card-number">03</div>
-            <h3 className="card-title">
-              Many<span className="gold">Talents</span> Money
-            </h3>
-            <p className="card-tagline">Grow what&apos;s entrusted.</p>
-            <p className="card-description">
-              Disciplined capital allocation tools — strategy development,
-              position sizing, risk management, and portfolio tracking. Treat
-              every dollar like it was given to you to multiply.
-            </p>
-            <span className="card-link">
-              Open Money
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
-            </span>
-          </Link>
+          {flags.money && (
+            <Link href="/money" className="product-card">
+              <div className="card-number">03</div>
+              <h3 className="card-title">
+                Many<span className="gold">Talents</span> Money
+              </h3>
+              <p className="card-tagline">Grow what&apos;s entrusted.</p>
+              <p className="card-description">
+                Disciplined capital allocation tools — strategy development,
+                position sizing, risk management, and portfolio tracking. Treat
+                every dollar like it was given to you to multiply.
+              </p>
+              <span className="card-link">
+                Open Money
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </span>
+            </Link>
+          )}
 
           <Link href="/kingdom" className="product-card">
             <div className="card-number">05</div>
