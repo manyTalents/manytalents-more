@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { QRCodeSVG } from "qrcode.react";
 import {
   getAuth,
   onboardTech,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 import { getFeatureFlags } from "@/lib/features";
+import { getErrorMessage } from "@/lib/errors";
 
 type PersonRole = "lead_tech" | "helper" | "office" | "office_field";
 
@@ -161,8 +163,8 @@ export default function TeamPage() {
       }
       resetForm();
       loadTechs();
-    } catch (err: any) {
-      setError(err.message || "Failed to add person");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Failed to add person");
     } finally {
       setSubmitting(false);
     }
@@ -174,11 +176,6 @@ export default function TeamPage() {
     secret: result.api_secret,
   }) : "";
 
-  // QR generated via API — credentials are in the URL but this is an internal admin page
-  // TODO: replace with client-side QR library (qrcode.react) to keep credentials local
-  const qrImageUrl = result
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrData)}`
-    : "";
 
   const selectedRoleInfo = ROLE_OPTIONS.find(r => r.value === role);
 
@@ -352,13 +349,7 @@ export default function TeamPage() {
                   </p>
 
                   <div className="inline-block bg-white rounded-xl p-3 mb-4">
-                    <img
-                      src={qrImageUrl}
-                      alt="QR Code for mobile app login"
-                      width={240}
-                      height={240}
-                      style={{ imageRendering: "pixelated" }}
-                    />
+                    <QRCodeSVG value={qrData} size={240} />
                   </div>
 
                   <p className="text-xs text-neutral-500 mb-2">
@@ -473,8 +464,8 @@ export default function TeamPage() {
                                 setResult(res);
                                 setOfficeResult(null);
                                 window.scrollTo({ top: 0, behavior: "smooth" });
-                              } catch (err: any) {
-                                setError(err.message || "Failed to generate QR");
+                              } catch (err: unknown) {
+                                setError(getErrorMessage(err) || "Failed to generate QR");
                               }
                             }}
                             className="text-xs text-gold hover:text-gold-light transition font-medium"
