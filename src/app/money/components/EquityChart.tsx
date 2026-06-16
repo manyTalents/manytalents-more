@@ -77,6 +77,7 @@ export default function EquityChart({
       window.addEventListener("resize", handleResize);
 
       // Store cleanup for the outer effect
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- custom cleanup attached to DOM node
       (containerRef.current as any).__cleanup = () => {
         window.removeEventListener("resize", handleResize);
         chart.remove();
@@ -84,12 +85,14 @@ export default function EquityChart({
       };
     });
 
+    // Capture ref value at effect time so cleanup uses the same node
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- custom cleanup attached to DOM node
+    const capturedEl = containerRef.current as any;
     return () => {
       cancelled = true;
-      const el = containerRef.current as any;
-      if (el?.__cleanup) {
-        el.__cleanup();
-        delete el.__cleanup;
+      if (capturedEl?.__cleanup) {
+        capturedEl.__cleanup();
+        delete capturedEl.__cleanup;
       }
     };
   }, [data, height, color, loading]);

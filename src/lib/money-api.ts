@@ -27,19 +27,6 @@ import type {
 
 const BASE = process.env.NEXT_PUBLIC_MONEY_API || "https://money-api.manytalentsmore.com";
 
-function getToken(): string {
-  const auth = getMoneyAuth();
-  if (!auth) throw new Error("Not authenticated");
-  return auth.token;
-}
-
-function headers(): Record<string, string> {
-  return {
-    Authorization: `Bearer ${getToken()}`,
-    Accept: "application/json",
-  };
-}
-
 async function fetchJSON<T>(url: string, useAuth = true): Promise<T> {
   const h: Record<string, string> = { Accept: "application/json" };
   if (useAuth) {
@@ -79,13 +66,13 @@ export const veoe = {
 // ── Crypto Endpoints (The Machine) ─────────────
 // Maps The Machine's /api/v1/dashboard to the existing frontend types.
 
-async function machineDashboard(): Promise<any> {
-  return fetchJSON<any>(`${BASE}/machine/api/v1/dashboard`, false);
+async function machineDashboard(): Promise<unknown> {
+  return fetchJSON<unknown>(`${BASE}/machine/api/v1/dashboard`, false);
 }
 
-async function machineTrades(): Promise<any[]> {
+async function machineTrades(): Promise<unknown[]> {
   try {
-    return await fetchJSON<any[]>(`${BASE}/machine/api/v1/trades`, false);
+    return await fetchJSON<unknown[]>(`${BASE}/machine/api/v1/trades`, false);
   } catch {
     return [];
   }
@@ -93,7 +80,8 @@ async function machineTrades(): Promise<any[]> {
 
 export const crypto = {
   balance: async (): Promise<CryptoBalance> => {
-    const d = await machineDashboard();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
+    const d = await machineDashboard() as any;
     const gridPnl = d.strategies?.grid?.daily_pnl || 0;
     const equity = (d.equity || 0) + gridPnl;
     return {
@@ -113,23 +101,26 @@ export const crypto = {
       );
       return res.points || [];
     } catch {
-      const d = await machineDashboard();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
+      const d = await machineDashboard() as any;
       const gridPnl = d.strategies?.grid?.daily_pnl || 0;
       return [{ timestamp: new Date().toISOString(), equity: (d.equity || 0) + gridPnl }];
     }
   },
   positions: async (): Promise<CryptoPosition[]> => {
-    const d = await machineDashboard();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
+    const d = await machineDashboard() as any;
     const grid = d.strategies?.grid;
     if (!grid?.instances) return [];
-    return grid.instances.map((inst: any, i: number) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
+    return (grid.instances as any[]).map((inst: any, i: number) => ({
       id: i,
       pair: inst.instrument || "",
       side: "GRID",
       entry_price: 0,
       quote_size: inst.daily_pnl || 0,
-      current_price: 0,
-      unrealized_pnl: inst.daily_pnl || 0,
+      base_size: 0,
+      entry_time: "",
       strategy: "grid",
       entry_fee: 0,
       strategy_name: `Grid (${inst.active_levels} levels)`,
@@ -137,7 +128,8 @@ export const crypto = {
   },
   trades: async (): Promise<CryptoTrade[]> => {
     const fills = await machineTrades();
-    return fills.map((f: any, i: number) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
+    return (fills as any[]).map((f: any, i: number) => ({
       id: f.id || i,
       pair: f.instrument || "",
       side: f.entry_side || "buy",
@@ -158,11 +150,14 @@ export const crypto = {
     }));
   },
   strategies: async (): Promise<CryptoStrategy[]> => {
-    const d = await machineDashboard();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
+    const d = await machineDashboard() as any;
     const strats = d.strategies || {};
     const fills = await machineTrades();
     const gridFillCount = fills.length;
-    const gridWins = fills.filter((f: any) => (f.cycle_pnl || 0) > 0).length;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
+    const gridWins = (fills as any[]).filter((f: any) => (f.cycle_pnl || 0) > 0).length;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
     return Object.entries(strats).map(([name, s]: [string, any], i) => {
       const isGrid = name === "grid";
       return {
@@ -188,7 +183,8 @@ export const crypto = {
     macro_filter: { trading_allowed: true, status: "ok", macro_score: 0 },
   }),
   risk: async (): Promise<CryptoRisk> => {
-    const d = await machineDashboard();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
+    const d = await machineDashboard() as any;
     const r = d.risk || {};
     const gridPnl = d.strategies?.grid?.daily_pnl || 0;
     const equity = (d.equity || 0) + gridPnl;
@@ -215,12 +211,15 @@ export const crypto = {
     try {
       return await fetchJSON<CryptoStats>(`${BASE}/machine/api/v1/stats`);
     } catch {
-      const d = await machineDashboard();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
+      const d = await machineDashboard() as any;
       const fills = await machineTrades();
       const gridPnl = d.strategies?.grid?.daily_pnl || 0;
       const totalTrades = fills.length;
-      const wins = fills.filter((f: any) => (f.cycle_pnl || 0) > 0).length;
-      const totalPnl = fills.reduce((sum: number, f: any) => sum + (f.cycle_pnl || 0), 0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
+      const wins = (fills as any[]).filter((f: any) => (f.cycle_pnl || 0) > 0).length;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
+      const totalPnl = (fills as any[]).reduce((sum: number, f: any) => sum + (f.cycle_pnl || 0), 0);
       const startingEquity = 436.55;
       const currentEquity = (d.equity || 0) + gridPnl;
       return {
@@ -229,7 +228,8 @@ export const crypto = {
         win_rate: totalTrades > 0 ? (wins / totalTrades) * 100 : 0,
         total_pnl: totalPnl,
         total_fees: 0,
-        avg_win: wins > 0 ? fills.filter((f: any) => (f.cycle_pnl || 0) > 0).reduce((s: number, f: any) => s + f.cycle_pnl, 0) / wins : 0,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party API response shape
+        avg_win: wins > 0 ? (fills as any[]).filter((f: any) => (f.cycle_pnl || 0) > 0).reduce((s: number, f: any) => s + f.cycle_pnl, 0) / wins : 0,
         avg_loss: 0,
         starting_equity: startingEquity,
         current_equity: currentEquity,
@@ -250,7 +250,9 @@ export const crypto = {
 // The Machine doesn't have WebSocket yet — no-op.
 
 export function connectCryptoWS(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- stub params; WebSocket not yet implemented
   _onMessage: (data: CryptoWSUpdate) => void,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- stub params; WebSocket not yet implemented
   _onError?: (err: Event) => void
 ): WebSocket | null {
   return null;

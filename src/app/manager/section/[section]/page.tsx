@@ -62,7 +62,7 @@ export default function SectionPage() {
       return;
     }
     getJobsByStatus(section)
-      .then((data: any) => setJobs(data || []))
+      .then((data: unknown) => setJobs((data as Job[]) || []))
       .catch((err) => console.warn("Failed to load jobs:", err))
       .finally(() => setLoading(false));
   }, [section, router, title]);

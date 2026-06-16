@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getAuth, getEstimateList, type EstimateSummary } from "@/lib/frappe";
 import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
+import { getErrorMessage } from "@/lib/errors";
 
 const STATUS_FILTERS = ["all", "Draft", "Sent", "Approved", "Declined", "Expired"] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
@@ -66,8 +67,8 @@ export default function EstimatesPage() {
       }
       setTotalCount(res.total_count);
       setHasMore(res.has_more);
-    } catch (err: any) {
-      setError(err.message || "Failed to load estimates");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Failed to load estimates");
     } finally {
       setLoading(false);
       setLoadingMore(false);

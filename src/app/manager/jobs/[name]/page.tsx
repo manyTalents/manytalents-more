@@ -20,6 +20,7 @@ import {
   type EstimateSummary,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
+import { getErrorMessage } from "@/lib/errors";
 
 const STATUS_COLORS: Record<string, string> = {
   Entered: "bg-neutral-700 text-neutral-300",
@@ -45,7 +46,7 @@ async function createAndMarkInvoiced(jobName: string, sendEmail: boolean) {
 // Workflow action config per status
 interface WorkflowAction {
   label: string;
-  action: (jobName: string) => Promise<any>;
+  action: (jobName: string) => Promise<unknown>;
   color: string;
   confirm?: string;
   secondary?: boolean;
@@ -117,6 +118,7 @@ export default function JobDetailPage() {
   const params = useParams();
   const jobName = params.name as string;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
@@ -152,8 +154,8 @@ export default function JobDetailPage() {
   const loadJob = () => {
     setLoading(true);
     getJobDetail(jobName)
-      .then((data: any) => setJob(data))
-      .catch((err) => setError(err.message || "Failed to load job"))
+      .then((data: unknown) => setJob(data))
+      .catch((err: unknown) => setError(getErrorMessage(err) || "Failed to load job"))
       .finally(() => setLoading(false));
   };
 
@@ -175,11 +177,13 @@ export default function JobDetailPage() {
       })
       .catch(() => {})
       .finally(() => setEstimatesLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadJob is stable within render; adding it would cause infinite loop
   }, [jobName, router]);
 
   const startEditingServices = () => {
     const rows =
       job.services && job.services.length > 0
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
         ? job.services.map((s: any) => ({
             description: s.description || "",
             qty: String(s.qty || ""),
@@ -226,15 +230,15 @@ export default function JobDetailPage() {
       setEditingServices(false);
       setActionResult("Services updated");
       loadJob();
-    } catch (err: any) {
-      setError(err.message || "Could not save services");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not save services");
     } finally {
       setSavingServices(false);
     }
   };
 
   const handleAction = async (
-    action: (name: string) => Promise<any>,
+    action: (name: string) => Promise<unknown>,
     confirmMsg?: string
   ) => {
     if (confirmMsg && !confirm(confirmMsg)) return;
@@ -242,23 +246,24 @@ export default function JobDetailPage() {
     setActionResult("");
     setError("");
     try {
-      const res = await action(jobName);
+      const raw = await action(jobName);
+      const res = raw as Record<string, unknown>;
       if (res?.sales_invoice) {
         const creds = getAuth();
         const siteUrl = creds?.siteUrl || "https://erp.manytalentsmore.com";
         setInvoiceInfo({
-          name: res.sales_invoice,
-          url: `${siteUrl}/app/sales-invoice/${res.sales_invoice}`,
+          name: res.sales_invoice as string,
+          url: `${siteUrl}/app/sales-invoice/${res.sales_invoice as string}`,
         });
         setActionResult(
-          `Invoice ${res.sales_invoice} created${res.emailed ? " and emailed" : ""}`
+          `Invoice ${res.sales_invoice as string} created${res.emailed ? " and emailed" : ""}`
         );
       } else {
-        setActionResult(`Status updated to ${res?.status || "success"}`);
+        setActionResult(`Status updated to ${(res?.status as string) || "success"}`);
       }
       loadJob();
-    } catch (err: any) {
-      setError(err.message || "Action failed");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Action failed");
     } finally {
       setActing(false);
     }
@@ -279,8 +284,8 @@ export default function JobDetailPage() {
       setSendBackTarget(null);
       setSendBackNote("");
       loadJob();
-    } catch (err: any) {
-      setError(err.message || "Send back failed");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Send back failed");
     } finally {
       setActing(false);
     }
@@ -316,8 +321,8 @@ export default function JobDetailPage() {
       setEditingInfo(false);
       setActionResult("Job info updated");
       loadJob();
-    } catch (err: any) {
-      setError(err.message || "Could not save job info");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not save job info");
     } finally {
       setSavingInfo(false);
     }
@@ -331,8 +336,8 @@ export default function JobDetailPage() {
       await addJobNote(jobName, noteText.trim());
       setNoteText("");
       loadJob();
-    } catch (err: any) {
-      setError(err.message || "Could not add note");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not add note");
     } finally {
       setSavingNote(false);
     }
@@ -611,6 +616,7 @@ export default function JobDetailPage() {
         {/* Photos */}
         {(() => {
           const siteUrl = getAuth()?.siteUrl || "https://erp.manytalentsmore.com";
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
           const photos: any[] = job.photos || job.attachments || [];
           return (
             <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
@@ -621,6 +627,7 @@ export default function JobDetailPage() {
                 <p className="text-neutral-500 text-sm">No photos yet.</p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
                   {photos.map((photo: any, i: number) => {
                     const rawUrl: string = photo.file_url || photo.url || "";
                     const fullUrl = rawUrl.startsWith("http")
@@ -635,6 +642,7 @@ export default function JobDetailPage() {
                         className="block aspect-square rounded-xl overflow-hidden border border-navy-border hover:border-gold-dark transition group"
                         aria-label={`Photo ${i + 1}`}
                       >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- authenticated Frappe file URL requires raw img to pass auth headers */}
                         <img
                           src={fullUrl}
                           alt={`Job photo ${i + 1}`}
@@ -677,6 +685,7 @@ export default function JobDetailPage() {
 
           {/* Existing notes — newest first */}
           {(() => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
             const notes: any[] = job.job_notes || [];
             if (notes.length === 0) {
               return (
@@ -690,6 +699,7 @@ export default function JobDetailPage() {
             });
             return (
               <ul className="space-y-3">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
                 {sorted.map((note: any, i: number) => (
                   <li
                     key={i}
@@ -861,6 +871,7 @@ export default function JobDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
                   {job.services.map((s: any, i: number) => (
                     <tr key={i} className="border-b border-navy-border/50">
                       <td className="py-2 pr-4 text-neutral-300">
@@ -900,6 +911,7 @@ export default function JobDetailPage() {
               Assigned Techs
             </p>
             <div className="flex flex-wrap gap-3">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
               {job.assigned_techs.map((t: any, i: number) => (
                 <div
                   key={i}
@@ -933,6 +945,7 @@ export default function JobDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
                   {job.materials.map((m: any, i: number) => (
                     <tr key={i} className="border-b border-navy-border/50">
                       <td className="py-2 pr-4 text-neutral-300">
@@ -1023,6 +1036,7 @@ export default function JobDetailPage() {
               Receipts ({job.receipts.length})
             </p>
             <div className="space-y-2">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
               {job.receipts.map((r: any, i: number) => (
                 <div
                   key={i}

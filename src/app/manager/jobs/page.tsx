@@ -110,7 +110,7 @@ export default function JobsPage() {
       return;
     }
     getJobList()
-      .then((data: any) => setAllJobs(data || []))
+      .then((data: unknown) => setAllJobs((data as Job[]) || []))
       .catch((err) => console.warn("Failed to load jobs:", err))
       .finally(() => setLoading(false));
   }, [router]);

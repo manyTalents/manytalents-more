@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { submitAccessRequest } from "@/lib/frappe";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function RequestAccessPage() {
   const [name, setName] = useState("");
@@ -32,8 +33,8 @@ export default function RequestAccessPage() {
         note: note.trim(),
       });
       setResult(res);
-    } catch (err: any) {
-      setError(err.message || "Something went wrong. Please try again.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -43,11 +44,11 @@ export default function RequestAccessPage() {
     <div className="min-h-screen flex items-center justify-center p-8">
       <div className="max-w-md w-full">
         <div className="text-center mb-10">
-          <a href="/" className="block">
+          <Link href="/" className="block">
             <h1 className="text-3xl font-serif font-extrabold mb-2">
               Many<span className="text-gold-gradient">Talents</span> Manager
             </h1>
-          </a>
+          </Link>
           <p className="text-neutral-400 text-sm tracking-wider uppercase">
             Request Access
           </p>
@@ -74,7 +75,7 @@ export default function RequestAccessPage() {
             <>
               <h2 className="text-xl font-serif font-bold mb-2">Request Access</h2>
               <p className="text-neutral-400 text-sm mb-6">
-                Submit your info and an admin will review your request. You'll get a login link once approved.
+                Submit your info and an admin will review your request. You&apos;ll get a login link once approved.
               </p>
 
               <div className="space-y-4">

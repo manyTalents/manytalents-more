@@ -22,8 +22,8 @@ export default function NeedsCheckWidget() {
 
   useEffect(() => {
     getJobsByStatus("needs_checked")
-      .then((data: any) => {
-        const list: JobRow[] = Array.isArray(data) ? data : (data?.jobs ?? []);
+      .then((data: unknown) => {
+        const list: JobRow[] = Array.isArray(data) ? (data as JobRow[]) : ((data as { jobs?: JobRow[] })?.jobs ?? []);
         setJobs(list.slice(0, MAX_ROWS));
       })
       .catch((err) => setError(err.message ?? "Failed to load"))

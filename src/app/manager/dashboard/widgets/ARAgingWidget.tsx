@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import WidgetShell from "./WidgetShell";
 import { getARAging, type ARBucket } from "@/lib/frappe";
 
-const BUCKET_KEYS = ["0-30", "31-60", "61-90", "91+"] as const;
-
 function bucketStyle(label: string): {
   card: string;
   badge: boolean;

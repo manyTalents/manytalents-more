@@ -43,7 +43,7 @@ export function SwapModal({ item, onConfirm, onClose }: SwapModalProps) {
         <p className="text-neutral-400 text-xs mb-5">
           Replacing: <span className="text-[#f0ebe0]">{item.item_name}</span>
           {item.reject_note && (
-            <span className="block mt-1 text-[#dc3545] italic">"{item.reject_note}"</span>
+            <span className="block mt-1 text-[#dc3545] italic">&ldquo;{item.reject_note}&rdquo;</span>
           )}
         </p>
 

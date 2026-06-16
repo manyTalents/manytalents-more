@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuth, callMethod } from "@/lib/frappe";
+import { getErrorMessage } from "@/lib/errors";
 import {
   getFeatureFlags,
   fetchFeatureFlags,
@@ -60,8 +61,8 @@ export default function FeatureFlagsPage() {
       );
       setSuccess(`${FLAG_LABELS.find((f) => f.key === key)?.label} ${newValue ? "enabled" : "disabled"}.`);
       setTimeout(() => setSuccess(""), 3000);
-    } catch (err: any) {
-      setError(err.message || "Failed to save flag");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Failed to save flag");
     } finally {
       setSaving(null);
     }

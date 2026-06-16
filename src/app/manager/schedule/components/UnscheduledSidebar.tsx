@@ -11,7 +11,7 @@ interface UnscheduledSidebarProps {
 
 const TRADES = ["all", "plumbing", "hvac", "electrical"] as const;
 
-export default function UnscheduledSidebar({ jobs, onRefresh }: UnscheduledSidebarProps) {
+export default function UnscheduledSidebar({ jobs }: UnscheduledSidebarProps) {
   const [filter, setFilter] = useState<string>("all");
   const filtered = filter === "all" ? jobs : jobs.filter((j) => getTrade(j.job_type) === filter);
 

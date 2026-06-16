@@ -13,6 +13,7 @@ import {
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 import { getFeatureFlags } from "@/lib/features";
+import { getErrorMessage } from "@/lib/errors";
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -90,8 +91,8 @@ export default function ServicePlanDetailPage() {
     try {
       const data = await getPlanDetail(planName);
       setPlan(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to load plan");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Failed to load plan");
     } finally {
       setLoading(false);
     }
@@ -109,8 +110,8 @@ export default function ServicePlanDetailPage() {
           : "Plan marked as Sent (email not configured)."
       );
       await loadPlan();
-    } catch (err: any) {
-      setActionError(err.message || "Could not send plan");
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err) || "Could not send plan");
     } finally {
       setActing(false);
     }
@@ -124,8 +125,8 @@ export default function ServicePlanDetailPage() {
       const res = await generateWorkOrder(planName);
       setWorkOrderResult(res);
       setActionSuccess(`Work order created: ${res.hcp_job_id}`);
-    } catch (err: any) {
-      setActionError(err.message || "Could not generate work order");
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err) || "Could not generate work order");
     } finally {
       setActing(false);
     }
@@ -140,8 +141,8 @@ export default function ServicePlanDetailPage() {
         plan_name: planName,
       });
       await loadPlan();
-    } catch (err: any) {
-      setActionError(err.message || "Could not cancel plan");
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err) || "Could not cancel plan");
     } finally {
       setActing(false);
     }

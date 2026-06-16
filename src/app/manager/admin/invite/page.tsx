@@ -9,6 +9,7 @@ import {
   createInvite,
   onboardNewUser,
 } from "@/lib/frappe";
+import { getErrorMessage } from "@/lib/errors";
 
 type Mode = "existing" | "new";
 type OfficeRole = "MTM Office" | "Accounts Manager" | "System Manager";
@@ -104,8 +105,8 @@ export default function AdminInvitePage() {
           roleAssigned: res.role_assigned,
         });
       }
-    } catch (err: any) {
-      setError(err.message || "Could not create invite");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not create invite");
     } finally {
       setSubmitting(false);
     }

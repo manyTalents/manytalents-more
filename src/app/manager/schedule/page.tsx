@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import NavBar from "../components/NavBar";
 import { getAuth } from "@/lib/frappe";
+import { getErrorMessage } from "@/lib/errors";
 import { fetchScheduleBoard, ScheduleBoardData, getWeekStart, createTimeOff } from "@/lib/schedule";
 import ScheduleGrid from "./components/ScheduleGrid";
 import UnscheduledSidebar from "./components/UnscheduledSidebar";
@@ -139,7 +140,7 @@ export default function SchedulePage() {
                   await createTimeOff({ employee: toEmployee, date: toDate, reason: toReason });
                   setShowTimeOff(false); setToEmployee(""); setToDate(""); setToReason("");
                   loadData();
-                } catch (err: any) { alert(err.message || "Failed"); }
+                } catch (err: unknown) { alert(getErrorMessage(err) || "Failed"); }
                 setToSaving(false);
               }} className="w-full bg-[#c9a84c] text-[#0f1729] font-bold py-2.5 rounded-lg disabled:opacity-50">
                 {toSaving ? "Submitting..." : "Submit Request"}

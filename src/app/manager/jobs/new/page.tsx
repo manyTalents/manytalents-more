@@ -14,6 +14,7 @@ import {
   type TechListItem,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
+import { getErrorMessage } from "@/lib/errors";
 
 // ── Phone formatting ──
 function formatPhone(raw: string): string {
@@ -42,6 +43,7 @@ function NewJobInner() {
   // Customer
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   // tracks whether the typed name matched any existing customer
@@ -52,6 +54,7 @@ function NewJobInner() {
   // Location
   const [address, setAddress] = useState("");
   const [town, setTown] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
   const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [customerAddresses, setCustomerAddresses] = useState<string[]>([]);
@@ -106,6 +109,7 @@ function NewJobInner() {
       searchCustomers(customerParam)
         .then((results) => {
           const match = (results || []).find(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
             (c: any) => c.name === customerParam || c.customer_name === customerParam
           );
           if (match) {
@@ -148,6 +152,7 @@ function NewJobInner() {
     }, 300);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
   const selectCustomer = async (cust: any) => {
     setCustomerName(cust.customer_name);
     setShowSuggestions(false);
@@ -206,6 +211,7 @@ function NewJobInner() {
     }, 300);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
   const selectAddress = (addr: any) => {
     setAddress(addr.address);
     if (addr.town && !town) setTown(addr.town);
@@ -258,17 +264,18 @@ function NewJobInner() {
         labor_description: laborDescription.trim(),
       });
 
+      const r = result as { name: string };
       // Assign selected techs post-creation (backend assign_tech endpoint)
       if (selectedTechs.size > 0) {
         const assignments = Array.from(selectedTechs).map((email) =>
-          assignTech(result.name, email, "Lead Tech").catch(() => {})
+          assignTech(r.name, email, "Lead Tech").catch(() => {})
         );
         await Promise.all(assignments);
       }
 
-      router.push(`/manager/jobs/${result.name}`);
-    } catch (err: any) {
-      setError(err.message || "Could not create job");
+      router.push(`/manager/jobs/${r.name}`);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not create job");
     } finally {
       setSubmitting(false);
     }

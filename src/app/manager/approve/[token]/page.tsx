@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { Suspense } from "react";
+import Link from "next/link";
 import {
   getAccessRequestByToken,
   approveAccessRequest,
   denyAccessRequest,
   type AccessRequestInfo,
 } from "@/lib/frappe";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function ApprovePage() {
   return (
@@ -74,8 +75,8 @@ function ApprovePageInner() {
         inviteUrl: res.invite_url,
         emailSent: res.email_sent,
       });
-    } catch (err: any) {
-      setActionError(err.message || "Could not approve.");
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err) || "Could not approve.");
     } finally {
       setActing(false);
     }
@@ -87,8 +88,8 @@ function ApprovePageInner() {
     try {
       const res = await denyAccessRequest({ token, reason: denyReason.trim() });
       setResult({ kind: "denied", email: res.requester_email });
-    } catch (err: any) {
-      setActionError(err.message || "Could not deny.");
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err) || "Could not deny.");
     } finally {
       setActing(false);
     }
@@ -223,11 +224,11 @@ function ApprovePageInner() {
     <div className="min-h-screen flex items-center justify-center p-8">
       <div className="max-w-lg w-full">
         <div className="text-center mb-8">
-          <a href="/" className="block">
+          <Link href="/" className="block">
             <h1 className="text-2xl font-serif font-extrabold mb-1">
               Many<span className="text-gold-gradient">Talents</span> Manager
             </h1>
-          </a>
+          </Link>
           <p className="text-neutral-400 text-sm">Access Request Review</p>
         </div>
 

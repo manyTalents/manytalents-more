@@ -11,6 +11,7 @@ import {
   loginWithPassword,
   requestPasswordReset,
 } from "@/lib/frappe";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function LoginPage() {
   return (
@@ -98,8 +99,8 @@ function LoginPageInner() {
         apiSecret: creds.api_secret,
       });
       router.replace("/manager/dashboard");
-    } catch (err: any) {
-      setLoginError(err.message || "Login failed");
+    } catch (err: unknown) {
+      setLoginError(getErrorMessage(err) || "Login failed");
     }
     setLoggingIn(false);
   };
@@ -115,32 +116,10 @@ function LoginPageInner() {
       await testConnection({ siteUrl, apiKey, apiSecret });
       setAuth({ siteUrl, apiKey, apiSecret });
       router.replace("/manager/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Connection failed");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Connection failed");
     }
     setTesting(false);
-  };
-
-  const handleSendLink = async () => {
-    if (!linkEmail.trim()) {
-      setLinkStatus({ kind: "error", message: "Enter your email address" });
-      return;
-    }
-    setLinkStatus({ kind: "sending" });
-    try {
-      const res = await requestLoginLink(linkEmail.trim().toLowerCase());
-      if (res.sent) {
-        setLinkStatus({ kind: "sent", message: res.message });
-      } else {
-        setLinkStatus({
-          kind: "error",
-          message: res.message || "Could not send login link.",
-          fallbackUrl: res.admin_fallback_url,
-        });
-      }
-    } catch (err: any) {
-      setLinkStatus({ kind: "error", message: err.message || "Could not send login link." });
-    }
   };
 
   // Redeeming spinner screen
@@ -160,11 +139,11 @@ function LoginPageInner() {
     <div className="min-h-screen flex items-center justify-center p-8">
       <div className="max-w-md w-full">
         <div className="text-center mb-10">
-          <a href="/" className="block">
+          <Link href="/" className="block">
             <h1 className="text-4xl font-serif font-extrabold mb-2">
               Many<span className="text-gold-gradient">Talents</span> Manager
             </h1>
-          </a>
+          </Link>
           <p className="text-neutral-400 text-sm tracking-wider uppercase">
             Office Dashboard
           </p>

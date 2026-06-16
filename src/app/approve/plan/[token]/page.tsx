@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useParams } from "next/navigation";
 import { approvePlan, declinePlan, getPlanByToken } from "@/lib/frappe";
+import { getErrorMessage } from "@/lib/errors";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -53,13 +54,14 @@ function PlanApprovalInner() {
   useEffect(() => {
     if (!token) return;
     getPlanByToken(token)
-      .then((data: PublicPlan) => {
+      .then((raw: unknown) => {
+        const data = raw as PublicPlan;
         setPlan(data);
         // Pre-populate if already actioned
         if (data.status === "Active") setOutcome("approved");
         else if (data.status === "Cancelled") setOutcome("declined");
       })
-      .catch((err: any) => setLoadError(err.message || "Could not load this plan."))
+      .catch((err: unknown) => setLoadError(getErrorMessage(err) || "Could not load this plan."))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -70,8 +72,8 @@ function PlanApprovalInner() {
     try {
       await approvePlan(token);
       setOutcome("approved");
-    } catch (err: any) {
-      setActionError(err.message || "Could not process your approval.");
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err) || "Could not process your approval.");
     } finally {
       setActing(false);
       setActingAction(null);
@@ -85,8 +87,8 @@ function PlanApprovalInner() {
     try {
       await declinePlan(token);
       setOutcome("declined");
-    } catch (err: any) {
-      setActionError(err.message || "Could not process your response.");
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err) || "Could not process your response.");
     } finally {
       setActing(false);
       setActingAction(null);

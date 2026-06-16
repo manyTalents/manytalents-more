@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getAuth, getPlanTemplates, type PlanTemplate } from "@/lib/frappe";
 import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
+import { getErrorMessage } from "@/lib/errors";
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export default function ServicePlanTemplatesPage() {
     if (!getFeatureFlags().service_plans) { router.replace("/manager/dashboard"); return; }
     getPlanTemplates()
       .then((res) => setTemplates(res.templates || []))
-      .catch((err: any) => setError(err.message || "Failed to load templates"))
+      .catch((err: unknown) => setError(getErrorMessage(err) || "Failed to load templates"))
       .finally(() => setLoading(false));
   }, [router]);
 

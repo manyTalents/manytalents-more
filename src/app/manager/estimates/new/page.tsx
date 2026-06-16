@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getAuth, searchCustomers, getCustomerHistory, createEstimate, sendEstimate } from "@/lib/frappe";
 import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
+import { getErrorMessage } from "@/lib/errors";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ function NewEstimateInner() {
   // Customer
   const [customerInput, setCustomerInput] = useState("");
   const [customerName, setCustomerName] = useState(""); // Frappe doc name
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const customerTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -103,6 +105,7 @@ function NewEstimateInner() {
     }, 300);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
   const selectCustomer = async (cust: any) => {
     setCustomerInput(cust.customer_name);
     setCustomerName(cust.name);
@@ -224,8 +227,8 @@ function NewEstimateInner() {
         notes: notes.trim(),
       });
       router.push(`/manager/estimates/${encodeURIComponent(res.name)}`);
-    } catch (err: any) {
-      setError(err.message || "Could not create estimate");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not create estimate");
     } finally {
       setSubmitting(false);
     }
@@ -252,8 +255,8 @@ function NewEstimateInner() {
       });
       await sendEstimate(created.name);
       router.push(`/manager/estimates/${encodeURIComponent(created.name)}`);
-    } catch (err: any) {
-      setError(err.message || "Could not send estimate");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not send estimate");
     } finally {
       setSubmitting(false);
     }

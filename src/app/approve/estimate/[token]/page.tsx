@@ -2,7 +2,8 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useParams } from "next/navigation";
-import { approveEstimateOption, type EstimateDetail, type EstimateOption } from "@/lib/frappe";
+import { approveEstimateOption, type EstimateOption } from "@/lib/frappe";
+import { getErrorMessage } from "@/lib/errors";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -29,20 +30,21 @@ async function loadPublicEstimate(token: string): Promise<PublicEstimate> {
     body: JSON.stringify({ token }),
   });
   const text = await res.text();
-  let json: any;
+  let json: unknown;
   try {
     json = JSON.parse(text);
   } catch {
     throw new Error("Unexpected response from server");
   }
+  const j = json as Record<string, unknown>;
   if (!res.ok) {
     const msg =
-      json?._server_messages
-        ? (() => { try { const m = JSON.parse(json._server_messages); const f = typeof m[0] === "string" ? JSON.parse(m[0]) : m[0]; return f?.message || ""; } catch { return ""; } })()
+      j?._server_messages
+        ? (() => { try { const m = JSON.parse(j._server_messages as string); const f = typeof m[0] === "string" ? JSON.parse(m[0]) : m[0]; return f?.message || ""; } catch { return ""; } })()
         : "";
-    throw new Error(msg || json?.exception || `Error ${res.status}`);
+    throw new Error(msg || (j?.exception as string) || `Error ${res.status}`);
   }
-  return json.message as PublicEstimate;
+  return j.message as PublicEstimate;
 }
 
 const fmtCurrency = (n: number) =>
@@ -216,8 +218,8 @@ function EstimateApprovalInner() {
       if (["Approved", "Declined"].includes(res.estimate_status)) {
         setGlobalDone(true);
       }
-    } catch (err: any) {
-      setActionErrors((prev) => ({ ...prev, [optIdx]: err.message || "Could not process your selection" }));
+    } catch (err: unknown) {
+      setActionErrors((prev) => ({ ...prev, [optIdx]: getErrorMessage(err) || "Could not process your selection" }));
     } finally {
       setActing((prev) => ({ ...prev, [optIdx]: false }));
     }

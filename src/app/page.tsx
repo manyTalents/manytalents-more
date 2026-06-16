@@ -13,7 +13,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { getFeatureFlags } from "@/lib/features";
 
 export default function LandingPage() {
@@ -24,6 +23,7 @@ export default function LandingPage() {
 
       <section className="hero">
         <div className="hero-content">
+          {/* eslint-disable-next-line @next/next/no-img-element -- logo in custom CSS context, next/image not compatible with this layout */}
           <img src="/mtm-logo.png" alt="ManyTalents More" className="logo" />
           <h1>
             Many<span className="gold">Talents</span> More
