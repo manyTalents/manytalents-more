@@ -304,7 +304,7 @@ export function RestockTab() {
                     {item.truck_label || item.truck_warehouse} rejected: {item.item_name}
                   </p>
                   {item.reject_note && (
-                    <p className="text-[11px] text-[#dc3545] italic mt-0.5">"{item.reject_note}"</p>
+                    <p className="text-[11px] text-[#dc3545] italic mt-0.5">&ldquo;{item.reject_note}&rdquo;</p>
                   )}
                   <p className="text-[11px] text-neutral-500 mt-0.5">
                     x{item.required_qty} &middot; {item.item_code}

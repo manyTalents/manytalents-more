@@ -19,6 +19,7 @@ interface WeekRow {
   avg: number;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- recharts tooltip props
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (

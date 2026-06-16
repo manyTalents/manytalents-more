@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getAuth, getCustomerProfile, callMethod, type CustomerProfile } from "@/lib/frappe";
 import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
+import { getErrorMessage } from "@/lib/errors";
 
 const STATUS_COLORS: Record<string, string> = {
   Entered: "bg-cream/10 text-cream/50",
@@ -59,7 +60,7 @@ export default function CustomerProfilePage() {
     if (!getFeatureFlags().customers) { router.replace("/manager/dashboard"); return; }
     getCustomerProfile(customerName)
       .then(setProfile)
-      .catch((err: any) => setError(err.message || "Failed to load customer"))
+      .catch((err: unknown) => setError(getErrorMessage(err) || "Failed to load customer"))
       .finally(() => setLoading(false));
   }, [customerName, router]);
 
@@ -161,8 +162,8 @@ export default function CustomerProfilePage() {
                           // Reload profile
                           const updated = await getCustomerProfile(customerName);
                           setProfile(updated);
-                        } catch (err: any) {
-                          setError(err.message || "Save failed");
+                        } catch (err: unknown) {
+                          setError(getErrorMessage(err) || "Save failed");
                         } finally { setSaving(false); }
                       }}
                       className="px-4 py-1.5 bg-gradient-to-br from-gold to-gold-dark text-navy font-bold text-xs rounded-lg"

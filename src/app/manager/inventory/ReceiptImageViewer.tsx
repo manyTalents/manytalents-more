@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import type { ReceiptItem } from "@/lib/inventory-api";
+import { getErrorMessage } from "@/lib/errors";
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -47,8 +48,8 @@ async function fetchAuthImage(receiptName: string): Promise<string | null> {
     }
     const data = await resp.json();
     return data?.message?.data_url || null;
-  } catch (e: any) {
-    console.warn("[ReceiptImage] error:", e.message);
+  } catch (e: unknown) {
+    console.warn("[ReceiptImage] error:", getErrorMessage(e));
     return null;
   }
 }
@@ -483,7 +484,7 @@ export function ReceiptCompareOverlay({
                 </svg>
                 <p className="text-neutral-500 text-sm font-medium">No receipt image available</p>
                 <p className="text-neutral-600 text-xs">
-                  This receipt was submitted without an image (e.g. Lowe's body receipt).
+                  This receipt was submitted without an image (e.g. Lowe&apos;s body receipt).
                 </p>
               </div>
             )}

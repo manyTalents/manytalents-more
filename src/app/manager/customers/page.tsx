@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getAuth, getCustomerList, type CustomerListItem } from "@/lib/frappe";
 import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
+import { getErrorMessage } from "@/lib/errors";
 
 const fmtCurrency = (n: number) =>
   `$${(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -51,8 +52,8 @@ export default function CustomersPage() {
       }
       setTotalCount(res.total_count);
       setHasMore(res.has_more);
-    } catch (err: any) {
-      setError(err.message || "Failed to load customers");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Failed to load customers");
     } finally {
       setLoading(false);
       setLoadingMore(false);

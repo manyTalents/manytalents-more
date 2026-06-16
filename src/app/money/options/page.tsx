@@ -115,7 +115,7 @@ function OptionsPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [macroSummary, setMacroSummary] = useState<any>(null)
   const [hasAccess, setHasAccess] = useState(false)
-  const [accessTier, setAccessTier] = useState(0)
+  const [, setAccessTier] = useState(0)
 
   // Check access on mount / URL params change
   useEffect(() => {
@@ -143,6 +143,7 @@ function OptionsPage() {
     if (hasAccess && (paidSessionId || adminMode || subEmail)) {
       loadFullRecommendations()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadFullRecommendations is stable within render; adding it would cause infinite loop
   }, [hasAccess, paidSessionId, adminMode, subEmail])
 
   // Supabase Realtime for positions (only when admin/paid)
@@ -173,6 +174,7 @@ function OptionsPage() {
         .limit(10)
 
       if (data && data.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase query result shape
         const teaser: TeaserRecommendation[] = data.map((r: any) => ({
           id: r.id,
           rank: r.rank,
@@ -361,7 +363,6 @@ function OptionsPage() {
           <FullRecommendationsTable
             recommendations={fullRecs}
             positions={positions}
-            addToast={addToast}
           />
         ) : (
           <>
@@ -438,11 +439,9 @@ function OptionsPage() {
 function FullRecommendationsTable({
   recommendations,
   positions,
-  addToast,
 }: {
   recommendations: Recommendation[]
   positions: Position[]
-  addToast: (msg: string, type: "success" | "error" | "info") => void
 }) {
   const [expanded, setExpanded] = useState<string | null>(null)
 

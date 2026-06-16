@@ -11,6 +11,7 @@ import {
   denyAccessRequest,
   type AccessRequestListItem,
 } from "@/lib/frappe";
+import { getErrorMessage } from "@/lib/errors";
 
 type Tab = "Pending" | "Approved" | "Denied" | "Expired";
 
@@ -49,6 +50,7 @@ export default function AdminRequestsPage() {
 
   useEffect(() => {
     if (allowed) refreshList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshList is stable within render; adding it would cause infinite loop
   }, [allowed, tab]);
 
   const refreshList = async () => {
@@ -57,8 +59,8 @@ export default function AdminRequestsPage() {
     try {
       const data = await listAccessRequests(tab);
       setRequests(data || []);
-    } catch (err: any) {
-      setError(err.message || "Could not load requests");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not load requests");
     } finally {
       setLoading(false);
     }
@@ -71,8 +73,8 @@ export default function AdminRequestsPage() {
       const res = await approveAccessRequest({ requestId: reqId, role });
       setFlash(`Approved ${res.user_email} as ${res.role_assigned}${res.email_sent ? " — login link emailed" : ""}`);
       await refreshList();
-    } catch (err: any) {
-      setError(err.message || "Could not approve");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not approve");
     } finally {
       setActingOn(null);
     }
@@ -87,8 +89,8 @@ export default function AdminRequestsPage() {
       setDenyReasonFor(null);
       setDenyReasonText("");
       await refreshList();
-    } catch (err: any) {
-      setError(err.message || "Could not deny");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not deny");
     } finally {
       setActingOn(null);
     }

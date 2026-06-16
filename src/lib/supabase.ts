@@ -25,6 +25,7 @@ export function getSupabase(): SupabaseClient {
 // Legacy export — lazy getter so import doesn't crash at build time
 export const supabase = new Proxy({} as SupabaseClient, {
   get(_target, prop) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Proxy pattern requires dynamic property access
     return (getSupabase() as any)[prop]
   },
 })

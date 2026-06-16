@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAuth, callMethod } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
+import { getErrorMessage } from "@/lib/errors";
 
 interface InvoiceSettings {
   default_markup_pct: number;
@@ -47,9 +48,9 @@ export default function InvoiceSettingsPage() {
         doctype: "MTM Invoice Settings",
         name: "MTM Invoice Settings",
       });
-      setSettings(res);
-    } catch (e: any) {
-      setError(e.message || "Failed to load settings");
+      setSettings(res as InvoiceSettings);
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) || "Failed to load settings");
     }
   };
 
@@ -64,13 +65,14 @@ export default function InvoiceSettingsPage() {
           doctype: "MTM Invoice Settings",
           name: "MTM Invoice Settings",
           fieldname: field,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic docfield access
           value: (settings as any)[field] ?? "",
         });
       }
       setSuccess("Settings saved");
       setTimeout(() => setSuccess(""), 3000);
-    } catch (e: any) {
-      setError(e.message || "Save failed");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) || "Save failed");
     }
     setSaving(false);
   };
@@ -119,7 +121,9 @@ export default function InvoiceSettingsPage() {
           <Section title="Invoice Clauses">
             {[1, 2, 3].map((i) => (
               <div key={i} className="mb-4 pl-3 border-l-2 border-gold-dark/30">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic docfield access */}
                 <Row label={`Clause ${i} Title`} value={(settings as any)[`clause_${i}_title`]} onChange={(v) => update(`clause_${i}_title`, v)} />
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic docfield access */}
                 <TextArea label={`Clause ${i} Text`} value={(settings as any)[`clause_${i}_text`]} onChange={(v) => update(`clause_${i}_text`, v)} />
               </div>
             ))}

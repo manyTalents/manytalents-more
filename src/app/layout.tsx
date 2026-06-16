@@ -22,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* eslint-disable-next-line @next/next/no-page-custom-font -- using raw Google Fonts link; next/font migration deferred */}
         <link
           href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"

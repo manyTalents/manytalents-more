@@ -54,6 +54,7 @@ export function getFeatureFlags(): FeatureFlags {
       fetchFeatureFlags().catch(() => {});
     }
     const f = cached.flags || ALL_OFF;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- legacy flag not in FeatureFlags type
     return { ...ALL_OFF, ...f, money: (f as any).money ?? true };
   } catch {
     return { ...ALL_OFF, money: true };

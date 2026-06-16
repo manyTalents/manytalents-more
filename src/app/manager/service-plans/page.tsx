@@ -15,6 +15,7 @@ import {
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 import { getFeatureFlags } from "@/lib/features";
+import { getErrorMessage } from "@/lib/errors";
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -63,11 +64,13 @@ function NewPlanModal({
   const [templateName, setTemplateName] = useState(templates[0]?.name ?? "");
   const [customerInput, setCustomerInput] = useState("");
   const [customerName, setCustomerName] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
   const [showCustomerSugg, setShowCustomerSugg] = useState(false);
   const customerTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const [addressInput, setAddressInput] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
   const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
   const [showAddressSugg, setShowAddressSugg] = useState(false);
   const addressTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -98,6 +101,7 @@ function NewPlanModal({
     }, 250);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
   const selectCustomer = (c: any) => {
     setCustomerInput(c.customer_name || c.name);
     setCustomerName(c.name);
@@ -125,6 +129,7 @@ function NewPlanModal({
     }, 250);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
   const selectAddress = (a: any) => {
     setAddressInput(a.address_line1 || a.name);
     setShowAddressSugg(false);
@@ -141,8 +146,8 @@ function NewPlanModal({
       const res = await createPlanInstance(templateName, customerName, addressInput.trim());
       onCreated(res.name);
       router.push(`/manager/service-plans/${encodeURIComponent(res.name)}`);
-    } catch (err: any) {
-      setError(err.message || "Could not create plan");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not create plan");
       setSubmitting(false);
     }
   };
@@ -336,8 +341,8 @@ export default function ServicePlansPage() {
       }
       setTotalCount(res.total_count);
       setHasMore(res.has_more);
-    } catch (err: any) {
-      setError(err.message || "Failed to load service plans");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Failed to load service plans");
     } finally {
       setLoading(false);
       setLoadingMore(false);

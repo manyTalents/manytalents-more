@@ -13,6 +13,7 @@ import {
 } from "@/lib/frappe";
 import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
+import { getErrorMessage } from "@/lib/errors";
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -160,7 +161,7 @@ export default function EstimateDetailPage() {
           setExpanded(new Set(data.options.map((_, i) => i)));
         }
       })
-      .catch((err: any) => setError(err.message || "Failed to load estimate"))
+      .catch((err: unknown) => setError(getErrorMessage(err) || "Failed to load estimate"))
       .finally(() => setLoading(false));
   }, [estimateName, router]);
 
@@ -186,8 +187,8 @@ export default function EstimateDetailPage() {
         res.email_sent ? "Estimate sent — customer will receive an email." : "Estimate marked as Sent (email not configured)."
       );
       await reload();
-    } catch (err: any) {
-      setActionError(err.message || "Could not send estimate");
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err) || "Could not send estimate");
     } finally {
       setActing(false);
     }
@@ -200,8 +201,8 @@ export default function EstimateDetailPage() {
     try {
       await expireEstimate(estimateName);
       await reload();
-    } catch (err: any) {
-      setActionError(err.message || "Could not expire estimate");
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err) || "Could not expire estimate");
     } finally {
       setActing(false);
     }

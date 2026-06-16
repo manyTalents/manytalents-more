@@ -184,36 +184,39 @@ export async function createJob(params: {
   labor_hours?: number;
   labor_rate?: number;
   labor_description?: string;
-}): Promise<any> {
+}): Promise<unknown> {
   return await callMethod(`${API}.create_job`, {
     ...params,
     is_estimate: params.is_estimate ? 1 : 0,
     is_vacant: params.is_vacant ? 1 : 0,
-  } as any);
+  } as Record<string, unknown>);
 }
 
 export async function updateJobServices(
   jobName: string,
   services: Array<{ description: string; qty: number; rate: number }>
-): Promise<any> {
+): Promise<unknown> {
   return await callMethod(`${API}.update_job_services`, {
     job_name: jobName,
     services: JSON.stringify(services),
   });
 }
 
-export async function saveJobField(jobName: string, field: string, value: string): Promise<any> {
+export async function saveJobField(jobName: string, field: string, value: string): Promise<unknown> {
   return callMethod(`${API}.save_job_field`, { job_name: jobName, field, value });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe search returns untyped records
 export async function searchCustomers(query: string): Promise<any[]> {
   return await callMethod(`${API}.search_customers`, { query });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe history returns untyped records
 export async function getCustomerHistory(customerName: string): Promise<any> {
   return await callMethod(`${API}.get_customer_history`, { customer_name: customerName });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe search returns untyped records
 export async function searchAddresses(query: string): Promise<any[]> {
   return await callMethod(`${API}.search_addresses`, { query });
 }
@@ -225,18 +228,19 @@ export async function searchAddresses(query: string): Promise<any[]> {
 const AUTH_API = "hcp_replacement.hcp_replacement.api.auth_utils";
 
 /** Extract a human-readable error from a Frappe error response */
-function parseFrappeError(json: any, fallback: string): string {
+function parseFrappeError(json: unknown, fallback: string): string {
+  const j = json as Record<string, unknown>;
   try {
-    if (json?._server_messages) {
-      const msgs = JSON.parse(json._server_messages);
+    if (j?._server_messages) {
+      const msgs = JSON.parse(j._server_messages as string);
       if (msgs?.[0]) {
         const first = typeof msgs[0] === "string" ? JSON.parse(msgs[0]) : msgs[0];
         if (first?.message) return String(first.message).replace(/<[^>]*>/g, "");
       }
     }
   } catch {}
-  if (json?.exception) return String(json.exception);
-  if (json?.message && typeof json.message === "string") return json.message;
+  if (j?.exception) return String(j.exception);
+  if (j?.message && typeof j.message === "string") return j.message;
   return fallback;
 }
 
@@ -254,7 +258,7 @@ async function callGuestMethod<T = unknown>(
     body: data ? JSON.stringify(data) : undefined,
   });
   const text = await res.text();
-  let json: any = null;
+  let json: unknown = null;
   try {
     json = JSON.parse(text);
   } catch {
@@ -263,7 +267,7 @@ async function callGuestMethod<T = unknown>(
   if (!res.ok) {
     throw new Error(parseFrappeError(json, `API ${method} failed (${res.status})`));
   }
-  return json.message as T;
+  return (json as Record<string, unknown>).message as T;
 }
 
 export interface RedeemInviteResponse {
@@ -910,7 +914,7 @@ export async function declinePlan(token: string) {
 }
 
 export async function getPlanByToken(token: string) {
-  return callGuestMethod<any>(`${PLANS_API}.get_plan_by_token`, { token });
+  return callGuestMethod<unknown>(`${PLANS_API}.get_plan_by_token`, { token });
 }
 
 export async function generateWorkOrder(planName: string) {

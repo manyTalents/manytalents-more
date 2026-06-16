@@ -11,6 +11,7 @@ import {
   removeApprover,
   type Approver,
 } from "@/lib/frappe";
+import { getErrorMessage } from "@/lib/errors";
 
 export default function ApproversPage() {
   const router = useRouter();
@@ -50,8 +51,8 @@ export default function ApproversPage() {
     try {
       const data = await listApprovers();
       setApprovers(data || []);
-    } catch (err: any) {
-      setError(err.message || "Could not load approvers");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not load approvers");
     } finally {
       setLoading(false);
     }
@@ -72,8 +73,8 @@ export default function ApproversPage() {
       setNewEmail("");
       await refreshList();
       setTimeout(() => setFlash(""), 3000);
-    } catch (err: any) {
-      setError(err.message || "Could not add approver");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not add approver");
     } finally {
       setAdding(false);
     }
@@ -89,8 +90,8 @@ export default function ApproversPage() {
       setFlash(`Removed ${email}`);
       await refreshList();
       setTimeout(() => setFlash(""), 3000);
-    } catch (err: any) {
-      setError(err.message || "Could not remove approver");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Could not remove approver");
     } finally {
       setRemovingEmail(null);
     }
