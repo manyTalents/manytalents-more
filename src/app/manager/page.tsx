@@ -31,6 +31,15 @@ function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Where to land after a successful login. Honors ?redirect= (e.g. an
+  // approval link that bounced the approver here to log in first), but only
+  // accepts internal paths to avoid open-redirect.
+  const redirectParam = searchParams.get("redirect");
+  const postLoginDest =
+    redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//")
+      ? redirectParam
+      : "/manager/dashboard";
+
   // Email + password login state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -80,9 +89,9 @@ function LoginPageInner() {
     }
     // No token — auto-redirect if already logged in
     if (getAuth()) {
-      router.replace("/manager/dashboard");
+      router.replace(postLoginDest);
     }
-  }, [router, searchParams]);
+  }, [router, searchParams, postLoginDest]);
 
   const handlePasswordLogin = async () => {
     if (!email.trim() || !password) {
@@ -98,7 +107,7 @@ function LoginPageInner() {
         apiKey: creds.api_key,
         apiSecret: creds.api_secret,
       });
-      router.replace("/manager/dashboard");
+      router.replace(postLoginDest);
     } catch (err: unknown) {
       setLoginError(getErrorMessage(err) || "Login failed");
     }
@@ -115,7 +124,7 @@ function LoginPageInner() {
     try {
       await testConnection({ siteUrl, apiKey, apiSecret });
       setAuth({ siteUrl, apiKey, apiSecret });
-      router.replace("/manager/dashboard");
+      router.replace(postLoginDest);
     } catch (err: unknown) {
       setError(getErrorMessage(err) || "Connection failed");
     }

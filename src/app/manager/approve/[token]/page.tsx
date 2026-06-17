@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 import Link from "next/link";
 import {
+  getAuth,
   getAccessRequestByToken,
   approveAccessRequest,
   denyAccessRequest,
@@ -29,6 +30,7 @@ export default function ApprovePage() {
 function ApprovePageInner() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const token = params.token as string;
   const actionParam = searchParams.get("action");
 
@@ -52,6 +54,14 @@ function ApprovePageInner() {
 
   useEffect(() => {
     if (!token) return;
+    // F-3: approving/denying requires an authenticated office-role session.
+    // If the approver clicked the email link while logged out, send them to
+    // login first, then bounce back here to review + act.
+    if (!getAuth()) {
+      const back = `/manager/approve/${token}${actionParam ? `?action=${actionParam}` : ""}`;
+      router.replace(`/manager?redirect=${encodeURIComponent(back)}`);
+      return;
+    }
     getAccessRequestByToken(token)
       .then((req) => {
         setRequest(req);
@@ -61,13 +71,13 @@ function ApprovePageInner() {
         setLoadError(err.message || "Could not load this request.");
       })
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, actionParam, router]);
 
   const handleApprove = async () => {
     setActing(true);
     setActionError("");
     try {
-      const res = await approveAccessRequest({ token, role: selectedRole });
+      const res = await approveAccessRequest({ requestId: request?.name, role: selectedRole });
       setResult({
         kind: "approved",
         email: res.user_email,
@@ -86,7 +96,7 @@ function ApprovePageInner() {
     setActing(true);
     setActionError("");
     try {
-      const res = await denyAccessRequest({ token, reason: denyReason.trim() });
+      const res = await denyAccessRequest({ requestId: request?.name, reason: denyReason.trim() });
       setResult({ kind: "denied", email: res.requester_email });
     } catch (err: unknown) {
       setActionError(getErrorMessage(err) || "Could not deny.");
