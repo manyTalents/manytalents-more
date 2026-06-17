@@ -478,13 +478,13 @@ export interface ApproveRequestResponse {
   email_sent: boolean;
 }
 
-/** Approve an access request (guest via token, or session via request_id) */
+/** Approve an access request. Requires an authenticated office-role session (F-3). */
 export async function approveAccessRequest(params: {
   token?: string;
   requestId?: string;
   role?: string;
 }): Promise<ApproveRequestResponse> {
-  return await callGuestMethod<ApproveRequestResponse>(`${AUTH_API}.approve_access_request`, {
+  return await callMethod<ApproveRequestResponse>(`${AUTH_API}.approve_access_request`, {
     token: params.token || "",
     request_id: params.requestId || "",
     role: params.role || "",
@@ -496,13 +496,13 @@ export interface DenyRequestResponse {
   requester_email: string;
 }
 
-/** Deny an access request (guest via token, or session via request_id) */
+/** Deny an access request. Requires an authenticated office-role session (F-3). */
 export async function denyAccessRequest(params: {
   token?: string;
   requestId?: string;
   reason?: string;
 }): Promise<DenyRequestResponse> {
-  return await callGuestMethod<DenyRequestResponse>(`${AUTH_API}.deny_access_request`, {
+  return await callMethod<DenyRequestResponse>(`${AUTH_API}.deny_access_request`, {
     token: params.token || "",
     request_id: params.requestId || "",
     reason: params.reason || "",
