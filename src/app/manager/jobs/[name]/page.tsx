@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -23,9 +23,11 @@ import {
   updateMaterialQty,
   updateMaterialRate,
   getJobChecklist,
+  getInvoiceSettings,
   type EstimateSummary,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
+import PaymentPanel from "@/app/manager/components/PaymentPanel";
 import { getErrorMessage } from "@/lib/errors";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -131,6 +133,10 @@ export default function JobDetailPage() {
   const [actionResult, setActionResult] = useState("");
   const [error, setError] = useState("");
 
+  // Card processing fee — loaded once from MTM Invoice Settings
+  const [cardProcessingPct, setCardProcessingPct] = useState(2.7);
+  const settingsFetched = useRef(false);
+
   // Editable services state
   const [editingServices, setEditingServices] = useState(false);
   const [serviceRows, setServiceRows] = useState<
@@ -199,6 +205,13 @@ export default function JobDetailPage() {
       })
       .catch(() => {})
       .finally(() => setEstimatesLoading(false));
+    // Fetch card processing pct once per page load
+    if (!settingsFetched.current) {
+      settingsFetched.current = true;
+      getInvoiceSettings()
+        .then((s) => setCardProcessingPct(s.card_processing_pct))
+        .catch(() => {/* use default 2.7 */});
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadJob is stable within render; adding it would cause infinite loop
   }, [jobName, router]);
 
@@ -441,8 +454,31 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Workflow actions */}
-        {actions.length > 0 && (
+        {/* Payment panel — shown when job has a Sales Invoice ready to collect */}
+        {job.status === "Invoiced" && job.sales_invoice && (
+          <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+            <p className="text-xs uppercase tracking-wider text-neutral-400 mb-5">
+              Collect Payment
+            </p>
+            <PaymentPanel
+              invoice={{
+                invoice_name: job.sales_invoice as string,
+                customer_name: job.customer_name as string,
+                customer_email: (job.customer_email as string | undefined) ?? "",
+                customer_phone: (job.customer_phone as string | undefined) ?? "",
+                amount: (job.grand_total as number | undefined) ?? (job.total_job_cost as number ?? 0),
+                card_processing_pct: cardProcessingPct,
+              }}
+              onPaid={() => {
+                setActionResult("Payment recorded — job marked Paid");
+                loadJob();
+              }}
+            />
+          </div>
+        )}
+
+        {/* Workflow actions — hidden for Invoiced (PaymentPanel handles it) */}
+        {actions.length > 0 && job.status !== "Invoiced" && (
           <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
             <p className="text-xs uppercase tracking-wider text-neutral-400 mb-4">
               Workflow Actions
