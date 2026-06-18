@@ -937,3 +937,40 @@ export async function getPlansDue(daysAhead = 14) {
     count: number;
   }>(`${PLANS_API}.get_plans_due`, { days_ahead: daysAhead });
 }
+
+// ── Materials & Checklist ──────────────────────────────────────
+const MATERIALS_API = "hcp_replacement.hcp_replacement.api.materials";
+
+export async function searchPricebook(query: string, limit = 20): Promise<Array<{
+  name: string;
+  item_name: string;
+  description?: string;
+  stock_uom?: string;
+  standard_rate: number;
+}>> {
+  return callMethod(`${MATERIALS_API}.search_pricebook`, { query, limit });
+}
+
+export async function addMaterial(jobName: string, item: string, quantity: number, source: string, warehouse: string): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.add_material`, { job_name: jobName, item, quantity, source, warehouse });
+}
+
+export async function removeMaterial(jobName: string, rowName: string): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.remove_material`, { job_name: jobName, row_name: rowName });
+}
+
+export async function updateMaterialQty(jobName: string, rowName: string, quantity: number): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.update_material_qty`, { job_name: jobName, row_name: rowName, quantity });
+}
+
+export async function updateMaterialRate(jobName: string, rowName: string, rate: number): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.update_material_rate`, { job_name: jobName, row_name: rowName, rate });
+}
+
+export async function getJobChecklist(jobName: string): Promise<{
+  job_name: string;
+  populated_from_template: boolean;
+  items: Array<{ idx: number; item_text: string; required: number; checked: number; checked_at: string | null; checked_by: string | null }>;
+}> {
+  return callMethod("hcp_replacement.hcp_replacement.api.checklists.get_job_checklist", { job_name: jobName });
+}

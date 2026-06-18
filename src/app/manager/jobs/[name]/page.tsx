@@ -17,6 +17,12 @@ import {
   getEstimateList,
   addJobNote,
   saveJobField,
+  searchPricebook,
+  addMaterial,
+  removeMaterial,
+  updateMaterialQty,
+  updateMaterialRate,
+  getJobChecklist,
   type EstimateSummary,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
@@ -146,6 +152,22 @@ export default function JobDetailPage() {
   const [editingInfo, setEditingInfo] = useState(false);
   const [infoFields, setInfoFields] = useState<Record<string, string>>({});
   const [savingInfo, setSavingInfo] = useState(false);
+
+  // Editable materials state
+  const [editingMaterials, setEditingMaterials] = useState(false);
+  const [materialSearch, setMaterialSearch] = useState("");
+  const [materialSearchResults, setMaterialSearchResults] = useState<Array<{ name: string; item_name: string; standard_rate: number }>>([]);
+  const [materialSearching, setMaterialSearching] = useState(false);
+  const [savingMaterials, setSavingMaterials] = useState(false);
+  const [addingMaterial, setAddingMaterial] = useState(false);
+  const [pendingAddQty, setPendingAddQty] = useState("1");
+
+  // Checklist (read-only audit view)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
+  const [checklist, setChecklist] = useState<any>(null);
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  const [checklistError, setChecklistError] = useState("");
+  const [checklistVisible, setChecklistVisible] = useState(false);
 
   // Notes
   const [noteText, setNoteText] = useState("");
@@ -928,45 +950,407 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Materials */}
-        {job.materials && job.materials.length > 0 && (
-          <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
-            <p className="text-xs uppercase tracking-wider text-neutral-400 mb-3">
-              Materials ({job.materials.length})
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-neutral-500 uppercase border-b border-navy-border">
-                    <th className="text-left py-2 pr-4">Item</th>
-                    <th className="text-right py-2 px-4">Qty</th>
-                    <th className="text-right py-2 px-4">Rate</th>
-                    <th className="text-right py-2 pl-4">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
-                  {job.materials.map((m: any, i: number) => (
-                    <tr key={i} className="border-b border-navy-border/50">
-                      <td className="py-2 pr-4 text-neutral-300">
-                        {m.item_name || m.item_code || "Unknown"}
-                      </td>
-                      <td className="py-2 px-4 text-right text-neutral-400">
-                        {m.qty}
-                      </td>
-                      <td className="py-2 px-4 text-right text-neutral-400">
-                        {fmtCurrency(m.rate)}
-                      </td>
-                      <td className="py-2 pl-4 text-right text-cream font-medium">
-                        {fmtCurrency(m.amount || m.qty * m.rate)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {/* Time Logs */}
+        {(() => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
+          const logs: any[] = job.time_logs || [];
+          if (logs.length === 0) return null;
+          const totalHours = logs.reduce((sum: number, l: any) => sum + (parseFloat(l.duration_hours) || 0), 0);
+          return (
+            <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs uppercase tracking-wider text-neutral-400">
+                  Time Logs
+                </p>
+                <span className="text-xs text-neutral-500">
+                  {totalHours.toFixed(2)} hrs total
+                </span>
+              </div>
+              <div className="space-y-2">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
+                {logs.map((log: any, i: number) => {
+                  const clockIn = log.start_time
+                    ? new Date(log.start_time).toLocaleString("en-US", {
+                        month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+                      })
+                    : "—";
+                  const clockOut = log.end_time
+                    ? new Date(log.end_time).toLocaleString("en-US", {
+                        hour: "numeric", minute: "2-digit",
+                      })
+                    : log.status === "Running" ? "Running..." : "—";
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between bg-navy border border-navy-border rounded-lg px-4 py-3"
+                    >
+                      <div>
+                        <p className="text-sm text-cream font-medium">
+                          {log.tech_user || "Unknown Tech"}
+                        </p>
+                        <p className="text-xs text-neutral-500">
+                          {clockIn}{log.end_time ? ` → ${clockOut}` : ""}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        {log.status === "Running" ? (
+                          <span className="text-xs bg-cyan-900/60 text-cyan-300 px-2 py-0.5 rounded-full">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="text-sm font-medium text-neutral-300">
+                            {parseFloat(log.duration_hours || 0).toFixed(2)} hrs
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
+          );
+        })()}
+
+        {/* Finish-Job Checklist (office audit) */}
+        <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs uppercase tracking-wider text-neutral-400">
+              Completion Checklist
+            </p>
+            {!checklistVisible ? (
+              <button
+                onClick={() => {
+                  setChecklistVisible(true);
+                  if (!checklist) {
+                    setChecklistLoading(true);
+                    setChecklistError("");
+                    getJobChecklist(jobName)
+                      .then((data) => setChecklist(data))
+                      .catch(() => setChecklistError("Could not load checklist"))
+                      .finally(() => setChecklistLoading(false));
+                  }
+                }}
+                className="text-xs text-gold hover:text-gold-light transition"
+              >
+                Load
+              </button>
+            ) : (
+              <button
+                onClick={() => setChecklistVisible(false)}
+                className="text-xs text-neutral-500 hover:text-cream transition"
+              >
+                Hide
+              </button>
+            )}
           </div>
-        )}
+
+          {checklistVisible && (
+            <>
+              {checklistLoading && (
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-5 h-5 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+                </div>
+              )}
+              {checklistError && (
+                <p className="text-red-400 text-sm">{checklistError}</p>
+              )}
+              {checklist && !checklistLoading && (
+                <ul className="space-y-2">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
+                  {(checklist.items as any[]).map((item: any) => (
+                    <li
+                      key={item.idx}
+                      className={`flex items-start gap-3 bg-navy border rounded-xl px-4 py-3 ${
+                        item.checked
+                          ? "border-emerald-900/60"
+                          : item.required
+                          ? "border-amber-900/40"
+                          : "border-navy-border"
+                      }`}
+                    >
+                      <span
+                        className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
+                          item.checked
+                            ? "border-emerald-500 bg-emerald-900/40 text-emerald-400"
+                            : item.required
+                            ? "border-amber-700 text-transparent"
+                            : "border-neutral-700 text-transparent"
+                        }`}
+                      >
+                        {item.checked ? "✓" : ""}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm leading-snug ${item.checked ? "text-neutral-300" : "text-cream"}`}>
+                          {item.item_text}
+                          {item.required ? (
+                            <span className="ml-1.5 text-xs text-amber-500/70 font-medium">required</span>
+                          ) : null}
+                        </p>
+                        {item.checked && (item.checked_by || item.checked_at) && (
+                          <p className="text-xs text-neutral-500 mt-0.5">
+                            {item.checked_by || "Unknown"}
+                            {item.checked_at
+                              ? ` · ${new Date(item.checked_at).toLocaleString("en-US", {
+                                  month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+                                })}`
+                              : ""}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {checklist && checklist.items.length === 0 && (
+                <p className="text-neutral-500 text-sm">No checklist items for this job type.</p>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Materials */}
+        <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs uppercase tracking-wider text-neutral-400">
+              Materials ({(job.materials || []).length})
+            </p>
+            {!editingMaterials ? (
+              <button
+                onClick={() => { setEditingMaterials(true); setMaterialSearch(""); setMaterialSearchResults([]); }}
+                className="text-xs text-gold hover:text-gold-light transition"
+              >
+                Edit
+              </button>
+            ) : (
+              <button
+                onClick={() => { setEditingMaterials(false); setMaterialSearch(""); setMaterialSearchResults([]); }}
+                className="text-xs text-neutral-500 hover:text-cream transition"
+              >
+                Done
+              </button>
+            )}
+          </div>
+
+          {editingMaterials ? (
+            <div className="space-y-3">
+              {/* Existing material rows — editable */}
+              {(job.materials || []).length === 0 ? (
+                <p className="text-neutral-500 text-sm">No materials yet. Add one below.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-neutral-500 uppercase border-b border-navy-border">
+                        <th className="text-left py-2 pr-2">Item</th>
+                        <th className="text-right py-2 px-2">Qty</th>
+                        <th className="text-right py-2 px-2">Rate</th>
+                        <th className="text-right py-2 px-2">Total</th>
+                        <th className="py-2 pl-2 w-6"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
+                      {(job.materials as any[]).map((m: any) => (
+                        <tr key={m.name} className="border-b border-navy-border/50">
+                          <td className="py-2 pr-2 text-neutral-300 text-xs max-w-[140px] truncate">
+                            {m.item_name || m.item || "Unknown"}
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <input
+                              type="number"
+                              step="1"
+                              min="0"
+                              defaultValue={m.quantity}
+                              onBlur={(e) => {
+                                const val = parseFloat(e.target.value);
+                                if (!isNaN(val) && val !== m.quantity) {
+                                  setSavingMaterials(true);
+                                  updateMaterialQty(jobName, m.name, val)
+                                    .then(() => loadJob())
+                                    .catch((err: unknown) => setError(getErrorMessage(err) || "Could not update qty"))
+                                    .finally(() => setSavingMaterials(false));
+                                }
+                              }}
+                              className="w-16 bg-navy border border-navy-border rounded px-2 py-1 text-sm text-cream text-right focus:outline-none focus:border-gold-dark"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              defaultValue={m.cost_rate}
+                              onBlur={(e) => {
+                                const val = parseFloat(e.target.value);
+                                if (!isNaN(val) && val !== m.cost_rate) {
+                                  setSavingMaterials(true);
+                                  updateMaterialRate(jobName, m.name, val)
+                                    .then(() => loadJob())
+                                    .catch((err: unknown) => setError(getErrorMessage(err) || "Could not update rate"))
+                                    .finally(() => setSavingMaterials(false));
+                                }
+                              }}
+                              className="w-20 bg-navy border border-navy-border rounded px-2 py-1 text-sm text-cream text-right focus:outline-none focus:border-gold-dark"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right text-gold font-medium text-sm">
+                            {fmtCurrency((m.quantity || 0) * (m.cost_rate || 0))}
+                          </td>
+                          <td className="py-2 pl-2 text-center">
+                            <button
+                              onClick={() => {
+                                if (!confirm(`Remove ${m.item_name || m.item}?`)) return;
+                                setSavingMaterials(true);
+                                removeMaterial(jobName, m.name)
+                                  .then(() => loadJob())
+                                  .catch((err: unknown) => setError(getErrorMessage(err) || "Could not remove material"))
+                                  .finally(() => setSavingMaterials(false));
+                              }}
+                              className="text-neutral-600 hover:text-red-400 text-lg leading-none"
+                              title="Remove"
+                              aria-label="Remove material"
+                            >
+                              ×
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Material total */}
+              {(job.materials || []).length > 0 && (
+                <div className="flex justify-end pt-1 border-t border-navy-border">
+                  <span className="text-xs text-neutral-500 mr-2">Materials total:</span>
+                  <span className="text-sm font-medium text-cream">{fmtCurrency(job.total_material_cost || 0)}</span>
+                </div>
+              )}
+
+              {savingMaterials && (
+                <p className="text-xs text-neutral-500 animate-pulse">Saving...</p>
+              )}
+
+              {/* Add material search */}
+              <div className="pt-3 border-t border-navy-border">
+                <p className="text-xs text-neutral-500 mb-2">Add material from pricebook</p>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={materialSearch}
+                    onChange={(e) => {
+                      const q = e.target.value;
+                      setMaterialSearch(q);
+                      if (q.length < 2) { setMaterialSearchResults([]); return; }
+                      setMaterialSearching(true);
+                      searchPricebook(q, 15)
+                        .then((res) => setMaterialSearchResults(res || []))
+                        .catch(() => setMaterialSearchResults([]))
+                        .finally(() => setMaterialSearching(false));
+                    }}
+                    placeholder="Search parts (e.g. 3/4 gate valve)..."
+                    className="w-full bg-navy border border-navy-border rounded px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark transition"
+                  />
+                  {materialSearching && (
+                    <div className="absolute right-3 top-2.5">
+                      <div className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+                {materialSearchResults.length > 0 && (
+                  <ul className="mt-1 bg-navy border border-navy-border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                    {materialSearchResults.map((item) => (
+                      <li key={item.name}>
+                        <button
+                          onClick={() => {
+                            setAddingMaterial(true);
+                            addMaterial(jobName, item.name, parseFloat(pendingAddQty) || 1, "office", "")
+                              .then(() => {
+                                setMaterialSearch("");
+                                setMaterialSearchResults([]);
+                                setPendingAddQty("1");
+                                loadJob();
+                              })
+                              .catch((err: unknown) => setError(getErrorMessage(err) || "Could not add material"))
+                              .finally(() => setAddingMaterial(false));
+                          }}
+                          disabled={addingMaterial}
+                          className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-navy-surface transition text-sm disabled:opacity-50"
+                        >
+                          <span className="text-cream">{item.item_name}</span>
+                          <span className="text-gold text-xs ml-2 flex-shrink-0">{fmtCurrency(item.standard_rate)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {addingMaterial && (
+                  <p className="text-xs text-neutral-500 mt-1 animate-pulse">Adding...</p>
+                )}
+                <div className="flex items-center gap-2 mt-2">
+                  <label className="text-xs text-neutral-500">Qty:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={pendingAddQty}
+                    onChange={(e) => setPendingAddQty(e.target.value)}
+                    className="w-16 bg-navy border border-navy-border rounded px-2 py-1 text-sm text-cream focus:outline-none focus:border-gold-dark"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (job.materials || []).length > 0 ? (
+            <div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-neutral-500 uppercase border-b border-navy-border">
+                      <th className="text-left py-2 pr-4">Item</th>
+                      <th className="text-right py-2 px-4">Qty</th>
+                      <th className="text-right py-2 px-4">Rate</th>
+                      <th className="text-right py-2 pl-4">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
+                    {(job.materials as any[]).map((m: any, i: number) => (
+                      <tr key={m.name || i} className="border-b border-navy-border/50">
+                        <td className="py-2 pr-4 text-neutral-300">
+                          {m.item_name || m.item_code || "Unknown"}
+                        </td>
+                        <td className="py-2 px-4 text-right text-neutral-400">
+                          {m.quantity}
+                        </td>
+                        <td className="py-2 px-4 text-right text-neutral-400">
+                          {fmtCurrency(m.cost_rate)}
+                        </td>
+                        <td className="py-2 pl-4 text-right text-cream font-medium">
+                          {fmtCurrency(m.amount || (m.quantity || 0) * (m.cost_rate || 0))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end pt-2 border-t border-navy-border mt-2">
+                <span className="text-xs text-neutral-500 mr-2">Materials total:</span>
+                <span className="text-sm font-medium text-cream">{fmtCurrency(job.total_material_cost || 0)}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-neutral-500 text-sm">
+              No materials added yet.{" "}
+              <button
+                onClick={() => { setEditingMaterials(true); setMaterialSearch(""); setMaterialSearchResults([]); }}
+                className="text-gold hover:text-gold-light"
+              >
+                Add materials
+              </button>
+            </p>
+          )}
+        </div>
 
         {/* Estimates */}
         <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
