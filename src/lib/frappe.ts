@@ -974,3 +974,169 @@ export async function getJobChecklist(jobName: string): Promise<{
 }> {
   return callMethod("hcp_replacement.hcp_replacement.api.checklists.get_job_checklist", { job_name: jobName });
 }
+
+// ── Payments ──────────────────────────────────────────────────────────────────
+
+const INVOICE_API = "hcp_replacement.hcp_replacement.api.invoice";
+const STRIPE_API = "hcp_replacement.hcp_replacement.api.stripe_payments";
+const RECEIPT_API = "hcp_replacement.hcp_replacement.api.receipt_delivery";
+
+export interface RecordPaymentResult {
+  success: boolean;
+  invoice_name: string;
+  method: string;
+  paid_at: string;
+}
+
+/** Record a cash or check payment against a Sales Invoice. */
+export async function recordPayment(
+  invoiceName: string,
+  method: "cash" | "check",
+  amount: number,
+  reference?: string
+): Promise<RecordPaymentResult> {
+  return callMethod<RecordPaymentResult>(`${INVOICE_API}.record_payment`, {
+    invoice_name: invoiceName,
+    method,
+    amount,
+    reference: reference ?? "",
+  });
+}
+
+export interface StripeConfig {
+  configured: boolean;
+  publishable_key?: string;
+}
+
+/** Fetch the Stripe publishable key from ERPNext site config. */
+export async function getStripeConfig(): Promise<StripeConfig> {
+  return callMethod<StripeConfig>(`${STRIPE_API}.get_stripe_config`);
+}
+
+export interface PaymentIntentResult {
+  client_secret: string;
+  payment_intent_id: string;
+  publishable_key: string;
+}
+
+/** Create a Stripe PaymentIntent for the given invoice + amount (card total, fee included). */
+export async function createPaymentIntent(
+  invoiceName: string,
+  amount: number
+): Promise<PaymentIntentResult> {
+  return callMethod<PaymentIntentResult>(`${STRIPE_API}.create_payment_intent`, {
+    invoice_name: invoiceName,
+    amount,
+  });
+}
+
+export interface ConfirmCardPaymentResult {
+  success: boolean;
+  invoice_name: string;
+  method: string;
+  paid_at: string;
+}
+
+/** Record a confirmed Stripe card payment in ERPNext. */
+export async function confirmCardPayment(
+  invoiceName: string,
+  paymentIntentId: string
+): Promise<ConfirmCardPaymentResult> {
+  return callMethod<ConfirmCardPaymentResult>(`${STRIPE_API}.confirm_card_payment`, {
+    invoice_name: invoiceName,
+    payment_intent_id: paymentIntentId,
+  });
+}
+
+export interface PaymentLinkResult {
+  url: string;
+  session_id: string;
+}
+
+/** Create a Stripe Checkout Session pay-link for a customer to pay remotely. */
+export async function createInvoicePaymentLink(
+  invoiceName: string
+): Promise<PaymentLinkResult> {
+  return callMethod<PaymentLinkResult>(`${STRIPE_API}.create_invoice_payment_link`, {
+    invoice_name: invoiceName,
+  });
+}
+
+export interface ReceiptTokenResult {
+  token_url: string;
+}
+
+/** Generate an opaque receipt token URL (used as a share target). */
+export async function generateReceiptToken(
+  invoiceName: string
+): Promise<ReceiptTokenResult> {
+  return callMethod<ReceiptTokenResult>(`${RECEIPT_API}.generate_receipt_token`, {
+    invoice_name: invoiceName,
+  });
+}
+
+export interface SendReceiptEmailResult {
+  success: boolean;
+  message: string;
+}
+
+/** Email the PDF receipt to a customer. */
+export async function sendReceiptEmail(
+  invoiceName: string,
+  email: string
+): Promise<SendReceiptEmailResult> {
+  return callMethod<SendReceiptEmailResult>(`${RECEIPT_API}.send_receipt_email`, {
+    invoice_name: invoiceName,
+    email,
+  });
+}
+
+export interface SendReceiptSmsResult {
+  success: boolean;
+  message: string;
+}
+
+/** SMS the receipt link to a customer. */
+export async function sendReceiptSms(
+  invoiceName: string,
+  phone: string
+): Promise<SendReceiptSmsResult> {
+  return callMethod<SendReceiptSmsResult>(`${RECEIPT_API}.send_receipt_sms`, {
+    invoice_name: invoiceName,
+    phone,
+  });
+}
+
+export interface InvoiceSettings {
+  card_processing_pct: number;
+  default_labor_rate: number;
+}
+
+/** Fetch MTM Invoice Settings (single doctype) — needed for card fee %. */
+export async function getInvoiceSettings(): Promise<InvoiceSettings> {
+  // MTM Invoice Settings is a Single doctype — read via the document API
+  const res = await fetch(
+    `${(getAuth()?.siteUrl || "https://erp.manytalentsmore.com").replace(/\/+$/, "")}/api/resource/MTM Invoice Settings/MTM Invoice Settings`,
+    {
+      headers: {
+        ...(() => {
+          const creds = getAuth();
+          if (!creds) throw new Error("Not authenticated");
+          return {
+            Authorization: `token ${creds.apiKey}:${creds.apiSecret}`,
+            Accept: "application/json",
+          };
+        })(),
+      },
+    }
+  );
+  if (!res.ok) {
+    // Graceful fallback — same defaults as the Python get_settings()
+    return { card_processing_pct: 2.7, default_labor_rate: 155 };
+  }
+  const json = await res.json() as { data?: { card_processing_pct?: number; default_labor_rate?: number } };
+  return {
+    card_processing_pct: json.data?.card_processing_pct ?? 2.7,
+    default_labor_rate: json.data?.default_labor_rate ?? 155,
+  };
+}
