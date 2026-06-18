@@ -952,10 +952,15 @@ export default function JobDetailPage() {
 
         {/* Time Logs */}
         {(() => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
-          const logs: any[] = job.time_logs || [];
+          const logs = (job.time_logs || []) as Array<{
+            tech_user?: string;
+            start_time?: string;
+            end_time?: string;
+            status?: string;
+            duration_hours?: string | number;
+          }>;
           if (logs.length === 0) return null;
-          const totalHours = logs.reduce((sum: number, l: any) => sum + (parseFloat(l.duration_hours) || 0), 0);
+          const totalHours = logs.reduce((sum: number, l) => sum + (parseFloat(String(l.duration_hours ?? 0)) || 0), 0);
           return (
             <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
               <div className="flex items-center justify-between mb-3">
@@ -967,8 +972,7 @@ export default function JobDetailPage() {
                 </span>
               </div>
               <div className="space-y-2">
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
-                {logs.map((log: any, i: number) => {
+                {logs.map((log, i) => {
                   const clockIn = log.start_time
                     ? new Date(log.start_time).toLocaleString("en-US", {
                         month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
@@ -999,7 +1003,7 @@ export default function JobDetailPage() {
                           </span>
                         ) : (
                           <span className="text-sm font-medium text-neutral-300">
-                            {parseFloat(log.duration_hours || 0).toFixed(2)} hrs
+                            {parseFloat(String(log.duration_hours ?? 0)).toFixed(2)} hrs
                           </span>
                         )}
                       </div>
