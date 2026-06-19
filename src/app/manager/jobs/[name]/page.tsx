@@ -24,7 +24,16 @@ import {
   updateMaterialRate,
   getJobChecklist,
   getInvoiceSettings,
+  uploadRawFile,
+  uploadAndClassifyPhoto,
+  syncHcpJob,
+  getClockStatus,
+  dayClockIn,
+  dayClockOut,
+  jobClockIn,
+  jobClockOut,
   type EstimateSummary,
+  type ClockStatusResult,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 import PaymentPanel from "@/app/manager/components/PaymentPanel";
@@ -179,6 +188,23 @@ export default function JobDetailPage() {
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
 
+  // Photo upload
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadPhotoError, setUploadPhotoError] = useState("");
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // HCP sync
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState("");
+  const [syncError, setSyncError] = useState("");
+
+  // Clock state
+  const [clockStatus, setClockStatus] = useState<ClockStatusResult | null>(null);
+  const [clockStatusLoading, setClockStatusLoading] = useState(false);
+  const [jobClocking, setJobClocking] = useState(false);
+  const [dayClocking, setDayClocking] = useState(false);
+  const [clockError, setClockError] = useState("");
+
   const loadJob = () => {
     setLoading(true);
     getJobDetail(jobName)
@@ -212,6 +238,12 @@ export default function JobDetailPage() {
         .then((s) => setCardProcessingPct(s.card_processing_pct))
         .catch(() => {/* use default 2.7 */});
     }
+    // Load clock status for this session
+    setClockStatusLoading(true);
+    getClockStatus()
+      .then((s) => setClockStatus(s))
+      .catch(() => {/* non-critical */})
+      .finally(() => setClockStatusLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadJob is stable within render; adding it would cause infinite loop
   }, [jobName, router]);
 
@@ -380,6 +412,85 @@ export default function JobDetailPage() {
 
   const fmtCurrency = (n: number) =>
     `$${(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // ── Photo upload handler ─────────────────────────────────
+  const handlePhotoUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploadingPhoto(true);
+    setUploadPhotoError("");
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        // Step 1: upload raw file to Frappe storage
+        const fileUrl = await uploadRawFile(file);
+        // Step 2: attach + classify against this job
+        await uploadAndClassifyPhoto(jobName, fileUrl);
+      }
+      loadJob();
+    } catch (err: unknown) {
+      setUploadPhotoError(getErrorMessage(err) || "Photo upload failed");
+    } finally {
+      setUploadingPhoto(false);
+      // Reset input so same file can be re-selected if needed
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
+  };
+
+  // ── HCP sync handler ─────────────────────────────────────
+  const handleHcpSync = async () => {
+    setSyncing(true);
+    setSyncResult("");
+    setSyncError("");
+    try {
+      const res = await syncHcpJob(jobName);
+      setSyncResult(`Synced at ${new Date(res.synced_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`);
+      loadJob();
+    } catch (err: unknown) {
+      setSyncError(getErrorMessage(err) || "HCP sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // ── Clock handlers ────────────────────────────────────────
+  const handleDayClock = async () => {
+    setDayClocking(true);
+    setClockError("");
+    try {
+      if (clockStatus?.clocked_in) {
+        await dayClockOut();
+        setClockStatus({ clocked_in: false });
+      } else {
+        const res = await dayClockIn();
+        setClockStatus({ clocked_in: true, clock_in_time: res.clock_in_time, timesheet: res.timesheet });
+      }
+    } catch (err: unknown) {
+      setClockError(getErrorMessage(err) || "Clock action failed");
+    } finally {
+      setDayClocking(false);
+    }
+  };
+
+  const handleJobClock = async () => {
+    const isJobRunning = (job.time_logs || []).some(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
+      (l: any) => l.status === "Running"
+    );
+    setJobClocking(true);
+    setClockError("");
+    try {
+      if (isJobRunning) {
+        await jobClockOut(jobName);
+      } else {
+        await jobClockIn(jobName);
+      }
+      loadJob();
+    } catch (err: unknown) {
+      setClockError(getErrorMessage(err) || "Clock action failed");
+    } finally {
+      setJobClocking(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -671,6 +782,116 @@ export default function JobDetailPage() {
           </div>
         </div>
 
+        {/* Clock Controls */}
+        <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs uppercase tracking-wider text-neutral-400">Clock Controls</p>
+            {clockStatusLoading && (
+              <div className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+            )}
+          </div>
+
+          {clockError && (
+            <p className="text-red-400 text-sm mb-3">{clockError}</p>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Day-level clock — applies to the user's whole day timesheet */}
+            <div className="flex-1 bg-navy border border-navy-border rounded-xl p-4">
+              <p className="text-xs text-neutral-500 mb-2 uppercase tracking-wider">Day Clock</p>
+              {clockStatus && (
+                <p className="text-xs text-neutral-400 mb-3">
+                  {clockStatus.clocked_in
+                    ? `Clocked in${clockStatus.clock_in_time
+                        ? ` at ${new Date(clockStatus.clock_in_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
+                        : ""}`
+                    : "Not clocked in"}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={handleDayClock}
+                disabled={dayClocking || clockStatusLoading}
+                className={`w-full text-sm font-bold py-2.5 rounded-lg transition disabled:opacity-50 ${
+                  clockStatus?.clocked_in
+                    ? "bg-amber-600/20 text-amber-300 border border-amber-700/40 hover:bg-amber-600/30"
+                    : "bg-emerald-600/20 text-emerald-300 border border-emerald-700/40 hover:bg-emerald-600/30"
+                }`}
+                aria-label={clockStatus?.clocked_in ? "Clock out for the day" : "Clock in for the day"}
+              >
+                {dayClocking
+                  ? "..."
+                  : clockStatus?.clocked_in
+                  ? "Clock Out (Day)"
+                  : "Clock In (Day)"}
+              </button>
+            </div>
+
+            {/* Per-job clock */}
+            <div className="flex-1 bg-navy border border-navy-border rounded-xl p-4">
+              <p className="text-xs text-neutral-500 mb-2 uppercase tracking-wider">Job Clock</p>
+              {(() => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
+                const running = (job.time_logs || []).some((l: any) => l.status === "Running");
+                return (
+                  <>
+                    <p className="text-xs text-neutral-400 mb-3">
+                      {running ? "Timer running on this job" : "No active timer"}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleJobClock}
+                      disabled={jobClocking}
+                      className={`w-full text-sm font-bold py-2.5 rounded-lg transition disabled:opacity-50 ${
+                        running
+                          ? "bg-amber-600/20 text-amber-300 border border-amber-700/40 hover:bg-amber-600/30"
+                          : "bg-cyan-600/20 text-cyan-300 border border-cyan-700/40 hover:bg-cyan-600/30"
+                      }`}
+                      aria-label={running ? "Stop job timer" : "Start job timer"}
+                    >
+                      {jobClocking ? "..." : running ? "Stop Job Timer" : "Start Job Timer"}
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+
+        {/* Push to HCP */}
+        <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-neutral-400 mb-1">HouseCall Pro Sync</p>
+              <p className="text-sm text-neutral-500">
+                Push materials, notes, and photos to HCP. Runs a full bi-directional sync.
+              </p>
+              {syncResult && (
+                <p className="text-sm text-emerald-400 mt-1">{syncResult}</p>
+              )}
+              {syncError && (
+                <p className="text-sm text-red-400 mt-1">{syncError}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleHcpSync}
+              disabled={syncing}
+              className="shrink-0 bg-gradient-to-br from-indigo-600 to-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg hover:opacity-90 transition disabled:opacity-50 whitespace-nowrap"
+              aria-label="Push this job to HouseCall Pro"
+            >
+              {syncing ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Syncing...
+                </span>
+              ) : (
+                "Push to HCP"
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* Photos */}
         {(() => {
           const siteUrl = getAuth()?.siteUrl || "https://erp.manytalentsmore.com";
@@ -678,9 +899,73 @@ export default function JobDetailPage() {
           const photos: any[] = job.photos || job.attachments || [];
           return (
             <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
-              <p className="text-xs uppercase tracking-wider text-neutral-400 mb-4">
-                Photos ({photos.length})
-              </p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs uppercase tracking-wider text-neutral-400">
+                  Photos ({photos.length})
+                </p>
+                {/* Upload trigger */}
+                <div className="flex items-center gap-2">
+                  {uploadPhotoError && (
+                    <span className="text-xs text-red-400">{uploadPhotoError}</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={uploadingPhoto}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg bg-gold/20 text-gold hover:bg-gold/30 transition disabled:opacity-50"
+                    aria-label="Upload photos"
+                  >
+                    {uploadingPhoto ? "Uploading..." : "+ Add Photos"}
+                  </button>
+                  {/* Hidden file input — accepts images, multiple selection */}
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="sr-only"
+                    aria-hidden="true"
+                    onChange={(e) => handlePhotoUpload(e.target.files)}
+                  />
+                </div>
+              </div>
+
+              {/* Drag-and-drop zone (shown when no photos yet, or always as a secondary target) */}
+              <div
+                className={`border-2 border-dashed rounded-xl p-4 mb-4 text-center transition-colors ${
+                  uploadingPhoto
+                    ? "border-gold/50 bg-gold/5"
+                    : "border-navy-border hover:border-gold/40 cursor-pointer"
+                }`}
+                role="button"
+                tabIndex={0}
+                aria-label="Drop photos here or click to upload"
+                onClick={() => !uploadingPhoto && photoInputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    if (!uploadingPhoto) photoInputRef.current?.click();
+                  }
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handlePhotoUpload(e.dataTransfer.files);
+                }}
+              >
+                {uploadingPhoto ? (
+                  <div className="flex items-center justify-center gap-2 text-gold text-sm">
+                    <div className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+                    <span>Uploading photos...</span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-neutral-500">
+                    Drag photos here or{" "}
+                    <span className="text-gold underline">click to browse</span>
+                  </p>
+                )}
+              </div>
+
               {photos.length === 0 ? (
                 <p className="text-neutral-500 text-sm">No photos yet.</p>
               ) : (

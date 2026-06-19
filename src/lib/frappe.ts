@@ -1112,6 +1112,157 @@ export interface InvoiceSettings {
   default_labor_rate: number;
 }
 
+// ── Job Photo Upload ───────────────────────────────────────────────────────────
+
+const PHOTO_API = "hcp_replacement.hcp_replacement.api.photo_upload";
+
+export interface PhotoUploadResult {
+  photo_row_name: string;
+  classification: string;
+  confidence: number;
+  quality_ok: boolean;
+  quality_warnings: string[];
+  receipt_name?: string;
+}
+
+/**
+ * Step 1 — upload a raw file to Frappe's file storage. Returns the server-side
+ * file_url which is then passed to uploadAndClassifyPhoto.
+ * Mirrors mobile queue.ts uploadFile().
+ */
+export async function uploadRawFile(file: File): Promise<string> {
+  const creds = getAuth();
+  if (!creds) throw new Error("Not authenticated");
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  formData.append("is_private", "0");
+  const res = await fetch(`${baseUrl()}/api/method/upload_file`, {
+    method: "POST",
+    headers: {
+      Authorization: `token ${creds.apiKey}:${creds.apiSecret}`,
+      // NOTE: do NOT set Content-Type — browser sets it with the correct boundary
+    },
+    body: formData,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`upload_file failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const json = await res.json() as { message?: { file_url?: string } };
+  const fileUrl = json.message?.file_url;
+  if (!fileUrl) throw new Error("upload_file returned no file_url");
+  return fileUrl;
+}
+
+/**
+ * Step 2 — classify/attach the uploaded file to a job.
+ * Mirrors mobile queue.ts uploadAndClassify().
+ * Endpoint: hcp_replacement.hcp_replacement.api.photo_upload.upload_and_classify
+ */
+export async function uploadAndClassifyPhoto(
+  hcpJobName: string,
+  fileUrl: string
+): Promise<PhotoUploadResult> {
+  return callMethod<PhotoUploadResult>(`${PHOTO_API}.upload_and_classify`, {
+    hcp_job_name: hcpJobName,
+    file_url: fileUrl,
+  });
+}
+
+// ── HCP Sync ──────────────────────────────────────────────────────────────────
+
+const HCP_SYNC_API = "hcp_replacement.hcp_replacement.core.hcp_sync";
+
+export interface SyncHcpJobResult {
+  status: string;
+  synced_at: string;
+}
+
+/**
+ * Push + pull sync between MTM and HouseCall Pro.
+ * Mirrors mobile JobDetailScreen.tsx handleSync().
+ * Endpoint: hcp_replacement.hcp_replacement.core.hcp_sync.sync_hcp_job
+ */
+export async function syncHcpJob(hcpJobName: string): Promise<SyncHcpJobResult> {
+  return callMethod<SyncHcpJobResult>(`${HCP_SYNC_API}.sync_hcp_job`, {
+    hcp_job_name: hcpJobName,
+  });
+}
+
+// ── Time Tracking (clock in/out) ──────────────────────────────────────────────
+
+const TIME_API = "hcp_replacement.hcp_replacement.api.time_tracking";
+
+export interface ClockStatusResult {
+  clocked_in: boolean;
+  clock_in_time?: string;
+  timesheet?: string;
+}
+
+export interface DayClockInResult {
+  status: string;
+  clock_in_time: string;
+  timesheet: string;
+}
+
+export interface DayClockOutResult {
+  status: string;
+  hours: number;
+}
+
+export interface JobClockInResult {
+  status: string;
+}
+
+export interface JobClockOutResult {
+  status: string;
+  hours: number;
+}
+
+/**
+ * Get the current user's day-level clock status.
+ * Endpoint: hcp_replacement.hcp_replacement.api.time_tracking.get_clock_status
+ */
+export async function getClockStatus(): Promise<ClockStatusResult> {
+  return callMethod<ClockStatusResult>(`${TIME_API}.get_clock_status`);
+}
+
+/**
+ * Clock the current user in for the day (creates a Timesheet).
+ * Endpoint: hcp_replacement.hcp_replacement.api.time_tracking.day_clock_in
+ */
+export async function dayClockIn(): Promise<DayClockInResult> {
+  return callMethod<DayClockInResult>(`${TIME_API}.day_clock_in`);
+}
+
+/**
+ * Clock the current user out for the day (closes the Timesheet).
+ * Endpoint: hcp_replacement.hcp_replacement.api.time_tracking.day_clock_out
+ */
+export async function dayClockOut(): Promise<DayClockOutResult> {
+  return callMethod<DayClockOutResult>(`${TIME_API}.day_clock_out`);
+}
+
+/**
+ * Clock in to a specific job.
+ * Endpoint: hcp_replacement.hcp_replacement.api.time_tracking.clock_in
+ */
+export async function jobClockIn(hcpJobName: string): Promise<JobClockInResult> {
+  return callMethod<JobClockInResult>(`${TIME_API}.clock_in`, {
+    hcp_job_name: hcpJobName,
+  });
+}
+
+/**
+ * Clock out of a specific job.
+ * Endpoint: hcp_replacement.hcp_replacement.api.time_tracking.clock_out
+ */
+export async function jobClockOut(hcpJobName: string): Promise<JobClockOutResult> {
+  return callMethod<JobClockOutResult>(`${TIME_API}.clock_out`, {
+    hcp_job_name: hcpJobName,
+  });
+}
+
 /** Fetch MTM Invoice Settings (single doctype) — needed for card fee %. */
 export async function getInvoiceSettings(): Promise<InvoiceSettings> {
   // MTM Invoice Settings is a Single doctype — read via the document API
