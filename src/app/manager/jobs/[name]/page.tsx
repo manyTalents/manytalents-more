@@ -32,11 +32,13 @@ import {
   dayClockOut,
   jobClockIn,
   jobClockOut,
+  getLinkedReceipts,
   type EstimateSummary,
   type ClockStatusResult,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 import PaymentPanel from "@/app/manager/components/PaymentPanel";
+import JobReceiptsModal from "@/app/manager/components/JobReceiptsModal";
 import { getErrorMessage } from "@/lib/errors";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -205,6 +207,10 @@ export default function JobDetailPage() {
   const [dayClocking, setDayClocking] = useState(false);
   const [clockError, setClockError] = useState("");
 
+  // Receipts dispatch modal
+  const [receiptsModalOpen, setReceiptsModalOpen] = useState(false);
+  const [receiptCount, setReceiptCount] = useState<number | null>(null);
+
   const loadJob = () => {
     setLoading(true);
     getJobDetail(jobName)
@@ -244,6 +250,10 @@ export default function JobDetailPage() {
       .then((s) => setClockStatus(s))
       .catch(() => {/* non-critical */})
       .finally(() => setClockStatusLoading(false));
+    // Load linked receipt count for the Receipts button
+    getLinkedReceipts(jobName)
+      .then((list) => setReceiptCount(list.length))
+      .catch(() => {/* non-critical — button still shows without count */});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadJob is stable within render; adding it would cause infinite loop
   }, [jobName, router]);
 
@@ -1738,35 +1748,50 @@ export default function JobDetailPage() {
           )}
         </div>
 
-        {/* Receipts */}
-        {job.receipts && job.receipts.length > 0 && (
-          <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
-            <p className="text-xs uppercase tracking-wider text-neutral-400 mb-3">
-              Receipts ({job.receipts.length})
-            </p>
-            <div className="space-y-2">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
-              {job.receipts.map((r: any, i: number) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between bg-navy border border-navy-border rounded-lg px-4 py-3"
-                >
-                  <div>
-                    <p className="text-sm text-cream">
-                      {r.supplier || "Unknown Supplier"}
-                    </p>
-                    <p className="text-xs text-neutral-500">
-                      {r.ocr_status || "pending"}
-                      {r.parsed_po_number ? ` · PO: ${r.parsed_po_number}` : ""}
-                    </p>
-                  </div>
-                  <p className="text-sm font-medium text-gold">
-                    {r.parsed_total ? fmtCurrency(r.parsed_total) : "—"}
-                  </p>
-                </div>
-              ))}
+        {/* Receipts — dispatch button */}
+        <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-neutral-400 mb-1">
+                Receipts
+              </p>
+              <p className="text-sm text-neutral-500">
+                {receiptCount === null
+                  ? "Loading..."
+                  : receiptCount === 0
+                  ? "No receipts linked to this job."
+                  : `${receiptCount} receipt${receiptCount !== 1 ? "s" : ""} linked — click to view and dispatch items.`}
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => setReceiptsModalOpen(true)}
+              disabled={receiptCount === 0}
+              className="shrink-0 ml-4 bg-gradient-to-br from-indigo-600 to-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg hover:opacity-90 transition disabled:opacity-40 whitespace-nowrap"
+              aria-label="Open receipts dispatch panel"
+            >
+              Receipts
+              {receiptCount !== null && receiptCount > 0 && (
+                <span className="ml-1.5 bg-white/20 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                  {receiptCount}
+                </span>
+              )}
+            </button>
           </div>
+        </div>
+
+        {/* Receipts dispatch modal */}
+        {receiptsModalOpen && (
+          <JobReceiptsModal
+            jobName={jobName}
+            onClose={() => setReceiptsModalOpen(false)}
+            onDispatched={() => {
+              // Refresh the receipt count after a dispatch
+              getLinkedReceipts(jobName)
+                .then((list) => setReceiptCount(list.length))
+                .catch(() => {/* non-critical */});
+            }}
+          />
         )}
       </main>
 
