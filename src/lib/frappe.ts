@@ -1263,6 +1263,104 @@ export async function jobClockOut(hcpJobName: string): Promise<JobClockOutResult
   });
 }
 
+// ── Receipt Dispatch ──────────────────────────────────────────────────────────
+
+const LIMBO_API = "hcp_replacement.hcp_replacement.api.limbo";
+const RECEIPT_OCR_API = "hcp_replacement.hcp_replacement.api.receipt_ocr";
+
+/** Destinations available when dispatching a receipt line item. */
+export type ReceiptDispatchDestination =
+  | "This Job"
+  | "Different Job"
+  | "Truck Stock"
+  | "Warehouse"
+  | "Return"
+  | "Discard";
+
+/** One parsed item row returned by get_receipt_dispatch_state. */
+export interface ReceiptDispatchLine {
+  /** `name` of the parsed-items child row — used as parsed_item_row. */
+  parsed_item_row: string;
+  description: string;
+  quantity: number;
+  product_code: string | null;
+  unit_price: number | null;
+  total_price: number | null;
+  dispatched: boolean;
+  dispatch_destination: ReceiptDispatchDestination | null;
+  destination_job: string | null;
+}
+
+export interface ReceiptDispatchState {
+  receipt_name: string;
+  supplier: string | null;
+  receipt_date: string | null;
+  parsed_total: number;
+  lines: ReceiptDispatchLine[];
+  pending_count: number;
+  dispatched_count: number;
+}
+
+/** One item in the items_json payload sent to dispatch_receipt_items. */
+export interface ReceiptDispatchPayloadItem {
+  parsed_item_row: string;
+  destination: ReceiptDispatchDestination;
+  dispatch_quantity: number;
+  destination_job?: string;
+}
+
+export interface DispatchReceiptItemsResult {
+  dispatched: number;
+  counts: Partial<Record<ReceiptDispatchDestination, number>>;
+}
+
+/**
+ * Fetch current dispatch state for every parsed line on a receipt.
+ * Endpoint: hcp_replacement.hcp_replacement.api.limbo.get_receipt_dispatch_state
+ */
+export async function getReceiptDispatchState(
+  receiptName: string
+): Promise<ReceiptDispatchState> {
+  return callMethod<ReceiptDispatchState>(`${LIMBO_API}.get_receipt_dispatch_state`, {
+    receipt_name: receiptName,
+  });
+}
+
+/**
+ * Dispatch one or more receipt lines to their chosen destinations.
+ * Endpoint: hcp_replacement.hcp_replacement.api.limbo.dispatch_receipt_items
+ */
+export async function dispatchReceiptItems(
+  receiptName: string,
+  items: ReceiptDispatchPayloadItem[]
+): Promise<DispatchReceiptItemsResult> {
+  return callMethod<DispatchReceiptItemsResult>(`${LIMBO_API}.dispatch_receipt_items`, {
+    receipt_name: receiptName,
+    items_json: JSON.stringify(items),
+  });
+}
+
+/** Summary row returned by get_linked_receipts. */
+export interface LinkedReceiptSummary {
+  name: string;
+  receipt_date: string | null;
+  supplier: string | null;
+  ocr_status: string;
+  parsed_total: number;
+}
+
+/**
+ * Fetch receipts linked to a job.
+ * Endpoint: hcp_replacement.hcp_replacement.api.receipt_ocr.get_linked_receipts
+ */
+export async function getLinkedReceipts(
+  hcpJobName: string
+): Promise<LinkedReceiptSummary[]> {
+  return callMethod<LinkedReceiptSummary[]>(`${RECEIPT_OCR_API}.get_linked_receipts`, {
+    hcp_job_name: hcpJobName,
+  });
+}
+
 /** Fetch MTM Invoice Settings (single doctype) — needed for card fee %. */
 export async function getInvoiceSettings(): Promise<InvoiceSettings> {
   // MTM Invoice Settings is a Single doctype — read via the document API
