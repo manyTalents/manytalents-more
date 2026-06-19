@@ -139,6 +139,68 @@ export async function fetchWarehouseList(): Promise<WarehouseListResponse> {
 }
 
 // ──────────────────────────────────────────────
+// Warehouse options (transfer picker)
+// ──────────────────────────────────────────────
+
+export interface WarehouseOption {
+  warehouse: string;
+  label: string;
+}
+
+export async function fetchWarehouseOptions(): Promise<WarehouseOption[]> {
+  return callMethod<WarehouseOption[]>(`${INV_API}.get_warehouse_options`);
+}
+
+// ──────────────────────────────────────────────
+// Stock transfer
+// ──────────────────────────────────────────────
+
+export interface TransferResult {
+  success: boolean;
+  stock_entry: string;
+  message: string;
+}
+
+export async function transferStockItem(
+  itemCode: string,
+  fromWarehouse: string,
+  toWarehouse: string,
+  qty: number
+): Promise<TransferResult> {
+  return callMethod<TransferResult>(`${INV_API}.transfer_stock_item`, {
+    item_code: itemCode,
+    from_warehouse: fromWarehouse,
+    to_warehouse: toWarehouse,
+    qty,
+  });
+}
+
+// ──────────────────────────────────────────────
+// Stock qty adjust
+// ──────────────────────────────────────────────
+
+export interface AdjustQtyResult {
+  status: "adjusted" | "no_change";
+  item?: string;
+  warehouse?: string;
+  old_qty?: number;
+  new_qty?: number;
+  qty?: number;
+}
+
+export async function adjustStockQty(
+  itemCode: string,
+  warehouse: string,
+  newQty: number
+): Promise<AdjustQtyResult> {
+  return callMethod<AdjustQtyResult>(`${INV_API}.adjust_stock_qty`, {
+    item_code: itemCode,
+    warehouse,
+    new_qty: newQty,
+  });
+}
+
+// ──────────────────────────────────────────────
 // Warehouse stock
 // ──────────────────────────────────────────────
 

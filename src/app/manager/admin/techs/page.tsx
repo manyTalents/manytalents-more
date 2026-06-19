@@ -12,6 +12,7 @@ import {
   type TechListItem,
   type OnboardTechResponse,
 } from "@/lib/frappe";
+import { fetchWarehouseOptions, type WarehouseOption } from "@/lib/inventory-api";
 import NavBar from "@/app/manager/components/NavBar";
 import { getFeatureFlags } from "@/lib/features";
 import { getErrorMessage } from "@/lib/errors";
@@ -25,15 +26,8 @@ const ROLE_OPTIONS: { value: PersonRole; label: string; description: string }[] 
   { value: "office", label: "Office Only", description: "Web dashboard only, no mobile app" },
 ];
 
-const VAN_OPTIONS = [
-  "Adam's Truck - AT",
-  "Chris's Truck - AT",
-  "Dereck's Truck - AT",
-  "Glen's Truck - AT",
-  "Matt's Truck - AT",
-  "Tim's Truck - AT",
-  "Warrens Truck - AT",
-];
+// VAN_OPTIONS removed — warehouse list is now fetched live from ERPNext
+// via get_warehouse_options (same source as the mobile app).
 
 const DESIGNATIONS = [
   "Lead Plumber",
@@ -73,6 +67,9 @@ export default function TeamPage() {
   const [emergencyName, setEmergencyName] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
 
+  // Live warehouse list — same source as mobile app
+  const [vanOptions, setVanOptions] = useState<WarehouseOption[]>([]);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -86,6 +83,10 @@ export default function TeamPage() {
     if (!getAuth()) { router.replace("/manager"); return; }
     if (!getFeatureFlags().team) { router.replace("/manager/dashboard"); return; }
     loadTechs();
+    // Fetch live warehouse list from ERPNext (same source as the mobile app)
+    fetchWarehouseOptions()
+      .then(setVanOptions)
+      .catch((e: unknown) => console.warn("[TeamPage] warehouse options failed:", e));
   }, [router]);
 
   const loadTechs = () => {
@@ -275,7 +276,7 @@ export default function TeamPage() {
                 </div>
               </div>
 
-              {/* Truck — only for lead tech */}
+              {/* Truck — only for lead tech. Options fetched live from ERPNext. */}
               {role === "lead_tech" && (
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-neutral-500 mb-1.5">Truck / Van</label>
@@ -284,9 +285,13 @@ export default function TeamPage() {
                     onChange={(e) => setVan(e.target.value)}
                     className="w-full bg-navy border border-navy-border rounded-lg px-4 py-3 text-cream focus:outline-none focus:border-gold-dark transition"
                   >
-                    <option value="">Select truck...</option>
-                    {VAN_OPTIONS.map((v) => (
-                      <option key={v} value={v}>{v.replace(" - AT", "")}</option>
+                    <option value="">
+                      {vanOptions.length === 0 ? "Loading trucks..." : "Select truck..."}
+                    </option>
+                    {vanOptions.map((wh) => (
+                      // value = full ERPNext warehouse name (e.g. "Adam's Truck - AT")
+                      // label = warehouse_name from ERPNext (e.g. "Adam's Truck") — no suffix needed
+                      <option key={wh.warehouse} value={wh.warehouse}>{wh.label}</option>
                     ))}
                   </select>
                 </div>
