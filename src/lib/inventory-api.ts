@@ -407,8 +407,17 @@ export async function fetchPullSummary(): Promise<PullSummary> {
 // ──────────────────────────────────────────────
 
 const MATCH_API = "hcp_replacement.hcp_replacement.api.match_review";
+const MATCH2_API = "hcp_replacement.hcp_replacement.api.match";
 
-export type MappingStatus = "Pending" | "Approved" | "Corrected" | "Not Item";
+export type MappingStatus =
+  | "Pending"
+  | "Matched"
+  | "Suggested"
+  | "Unmatched"
+  | "Manual"
+  | "Not Item"
+  | "Approved"
+  | "Corrected";
 
 export interface UnmatchedItem {
   name: string;
@@ -423,6 +432,11 @@ export interface UnmatchedItem {
   supplier: string;
   receipt_date: string;
   match_count: number;
+  /** Phase 2 — AI suggestion fields */
+  parsed_item_name?: string;
+  suggested_item?: string;
+  suggestion_score?: number;
+  suggested_item_name?: string;
 }
 
 export interface UnmatchedItemsResponse {
@@ -526,6 +540,83 @@ export function getConfidenceTier(matchCount: number): ConfidenceTier {
   if (matchCount >= 5) return "locked_in";
   if (matchCount >= 1) return "first_match";
   return "unmatched";
+}
+
+// ──────────────────────────────────────────────
+// Phase 2 — Confirm-to-Lock + Office QC
+// ──────────────────────────────────────────────
+
+export interface ConfirmMatchResult {
+  match_count: number;
+  confidence_tier: "unmatched" | "first_match" | "locked_in";
+}
+
+export async function confirmMatch(
+  parsedItemName: string,
+  itemCode: string
+): Promise<ConfirmMatchResult> {
+  return callMethod<ConfirmMatchResult>(`${MATCH2_API}.confirm_match`, {
+    parsed_item_name: parsedItemName,
+    item_code: itemCode,
+  });
+}
+
+export async function rejectMatch(
+  parsedItemName: string,
+  correctedItemCode?: string
+): Promise<ConfirmMatchResult> {
+  return callMethod<ConfirmMatchResult>(`${MATCH2_API}.reject_match`, {
+    parsed_item_name: parsedItemName,
+    corrected_item_code: correctedItemCode ?? null,
+  });
+}
+
+export interface SupplierMapping {
+  /** Item Supplier child-table row name — pass to update/delete */
+  name: string;
+  /** Item code (parent item) */
+  parent: string;
+  /** item_name from Item doctype */
+  item_name: string;
+  supplier: string;
+  supplier_part_no: string;
+  match_count: number;
+}
+
+export interface MappingsPage {
+  rows: SupplierMapping[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export async function listSupplierMappings(
+  supplier?: string,
+  page = 1
+): Promise<MappingsPage> {
+  return callMethod<MappingsPage>(`${MATCH2_API}.list_supplier_mappings`, {
+    ...(supplier ? { supplier } : {}),
+    page,
+    page_size: 50,
+  });
+}
+
+export async function updateSupplierMapping(
+  rowName: string,
+  itemCode: string
+): Promise<{ ok: boolean }> {
+  return callMethod<{ ok: boolean }>(`${MATCH2_API}.update_supplier_mapping`, {
+    item_supplier_row_name: rowName,
+    item_code: itemCode,
+  });
+}
+
+export async function deleteSupplierMapping(
+  rowName: string
+): Promise<{ ok: boolean }> {
+  return callMethod<{ ok: boolean }>(`${MATCH2_API}.delete_supplier_mapping`, {
+    item_supplier_row_name: rowName,
+  });
 }
 
 // ── Pricebook Requests ──

@@ -8,6 +8,8 @@ import {
   correctMatch,
   bulkApprove,
   getConfidenceTier,
+  confirmMatch,
+  rejectMatch,
   type UnmatchedItem,
   type PricebookResult,
 } from "@/lib/inventory-api";
@@ -181,6 +183,62 @@ export function MatchesTab({ onCountChange }: MatchesTabProps) {
     }
   };
 
+  // Phase 2 — confirm AI suggestion
+  const handleConfirm = async (item: UnmatchedItem) => {
+    const parsedName = item.parsed_item_name ?? item.name;
+    const suggestedCode = item.suggested_item;
+    if (!suggestedCode) return;
+    setActionLoading((s) => ({ ...s, [`confirm_${item.name}`]: true }));
+    try {
+      const res = await confirmMatch(parsedName, suggestedCode);
+      if (res.confidence_tier === "locked_in") {
+        showToast("Confirmed — mapping locked in after 5 confirmations.");
+      } else {
+        showToast("Suggestion confirmed.");
+      }
+      removeRow(item.name);
+    } catch (e: unknown) {
+      console.warn("[MatchesTab] handleConfirm error:", e);
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+    } finally {
+      setActionLoading((s) => ({ ...s, [`confirm_${item.name}`]: false }));
+    }
+  };
+
+  // Phase 2 — reject AI suggestion (no corrected code = reset to Unmatched)
+  const handleReject = async (item: UnmatchedItem) => {
+    const parsedName = item.parsed_item_name ?? item.name;
+    setActionLoading((s) => ({ ...s, [`reject_${item.name}`]: true }));
+    try {
+      await rejectMatch(parsedName);
+      showToast("Suggestion rejected — line reset to Unmatched.");
+      // Reload: the row status changed but it stays in the queue as Unmatched
+      await load(1, true);
+    } catch (e: unknown) {
+      console.warn("[MatchesTab] handleReject error:", e);
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+    } finally {
+      setActionLoading((s) => ({ ...s, [`reject_${item.name}`]: false }));
+    }
+  };
+
+  // Phase 2 — FIX on a Suggested row → correct-and-learn path via rejectMatch(name, code)
+  const handleCorrectSuggested = async (item: UnmatchedItem, result: PricebookResult) => {
+    const parsedName = item.parsed_item_name ?? item.name;
+    setActionLoading((s) => ({ ...s, [item.name]: true }));
+    setFixingRow(null);
+    try {
+      await rejectMatch(parsedName, result.name);
+      showToast(`Corrected to "${result.item_name}" — saved for future auto-matching.`);
+      removeRow(item.name);
+    } catch (e: unknown) {
+      console.warn("[MatchesTab] handleCorrectSuggested error:", e);
+      showToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+    } finally {
+      setActionLoading((s) => ({ ...s, [item.name]: false }));
+    }
+  };
+
   const toggleAll = () => {
     const next = !allChecked;
     setAllChecked(next);
@@ -338,7 +396,10 @@ export function MatchesTab({ onCountChange }: MatchesTabProps) {
           const isFixing = fixingRow === item.name;
           const isLoading = !!actionLoading[item.name];
           const isNotItemLoading = !!actionLoading[`ni_${item.name}`];
+          const isConfirmLoading = !!actionLoading[`confirm_${item.name}`];
+          const isRejectLoading = !!actionLoading[`reject_${item.name}`];
           const hasMatch = !!item.matched_item;
+          const isSuggested = item.mapping_status === "Suggested" && !!item.suggested_item && !hasMatch;
           const isCorrected = item.mapping_status === "Corrected";
           const isFocused = focusedIdx === idx;
 
@@ -381,17 +442,27 @@ export function MatchesTab({ onCountChange }: MatchesTabProps) {
             );
           }
 
-          // Row background based on tier
+          // Row background based on tier / status
           const rowBg = isLockedIn
             ? "bg-[#1565C0]"
+            : isSuggested
+            ? "bg-[#FFF8E1]"
             : isFirstMatch
             ? "bg-[#E3F2FD]"
             : isCorrected
             ? "bg-[#28a745]/5"
             : "";
 
-          const rowText = isFirstMatch ? "text-[#1565C0]" : "";
-          const borderColor = isFirstMatch ? "border-[#90CAF9]" : "border-[#1a1f32]";
+          const rowText = isSuggested
+            ? "text-[#B45309]"
+            : isFirstMatch
+            ? "text-[#1565C0]"
+            : "";
+          const borderColor = isSuggested
+            ? "border-[#F59E0B]"
+            : isFirstMatch
+            ? "border-[#90CAF9]"
+            : "border-[#1a1f32]";
 
           return (
             <div
@@ -415,14 +486,21 @@ export function MatchesTab({ onCountChange }: MatchesTabProps) {
                 {/* OCR Text */}
                 <div className="px-3 min-w-0">
                   {item.product_code && (
-                    <p className={`text-[11px] font-mono font-bold mb-0.5 ${isFirstMatch ? "text-[#1565C0]" : "text-[#c9a84c]"}`}>
+                    <p className={`text-[11px] font-mono font-bold mb-0.5 ${isSuggested ? "text-[#B45309]" : isFirstMatch ? "text-[#1565C0]" : "text-[#c9a84c]"}`}>
                       {item.product_code}
                     </p>
                   )}
-                  <p className={`text-sm leading-snug break-words ${isFirstMatch ? "text-[#1565C0]" : "text-[#f0ebe0]"}`}>
-                    {item.description}
-                  </p>
-                  <p className={`text-[10px] mt-1 ${isFirstMatch ? "text-[#1565C0]/60" : "text-neutral-600"}`}>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className={`text-sm leading-snug break-words ${isSuggested ? "text-[#92400E]" : isFirstMatch ? "text-[#1565C0]" : "text-[#f0ebe0]"}`}>
+                      {item.description}
+                    </p>
+                    {isSuggested && (
+                      <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded-full font-bold flex-shrink-0">
+                        SUGGESTED
+                      </span>
+                    )}
+                  </div>
+                  <p className={`text-[10px] mt-1 ${isSuggested ? "text-[#B45309]/60" : isFirstMatch ? "text-[#1565C0]/60" : "text-neutral-600"}`}>
                     {fmtDate(item.receipt_date)} &middot; {item.receipt_name}
                   </p>
                 </div>
@@ -434,18 +512,29 @@ export function MatchesTab({ onCountChange }: MatchesTabProps) {
 
                 {/* Score */}
                 <div className="px-3">
-                  {item.match_score > 0 ? (
+                  {isSuggested && (item.suggestion_score ?? 0) > 0 ? (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full border bg-amber-50 border-amber-300 text-amber-700">
+                      {Math.round(item.suggestion_score ?? 0)}%?
+                    </span>
+                  ) : item.match_score > 0 ? (
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${scoreColor(item.match_score)} ${scoreBg(item.match_score)}`}>
                       {Math.round(item.match_score)}%
                     </span>
                   ) : (
-                    <span className={`text-xs ${isFirstMatch ? "text-[#1565C0]/50" : "text-neutral-600"}`}>—</span>
+                    <span className={`text-xs ${isSuggested ? "text-amber-500/50" : isFirstMatch ? "text-[#1565C0]/50" : "text-neutral-600"}`}>—</span>
                   )}
                 </div>
 
                 {/* Current Match */}
                 <div className="px-3">
-                  {hasMatch ? (
+                  {isSuggested ? (
+                    <div>
+                      <p className="text-xs leading-snug font-mono break-all text-amber-700">
+                        {item.suggested_item_name || item.suggested_item}
+                      </p>
+                      <span className="text-[10px] text-amber-500 font-semibold block mt-0.5">Suggested</span>
+                    </div>
+                  ) : hasMatch ? (
                     <p className={`text-xs leading-snug font-mono break-all ${isFirstMatch ? "text-[#1565C0]" : "text-[#f0ebe0]"}`}>
                       {item.matched_item}
                     </p>
@@ -459,67 +548,116 @@ export function MatchesTab({ onCountChange }: MatchesTabProps) {
 
                 {/* Actions */}
                 <div className="px-3 flex items-center gap-1.5 flex-wrap">
-                  {/* FIX */}
-                  <button
-                    onClick={() => setFixingRow(isFixing ? null : item.name)}
-                    disabled={isLoading || isNotItemLoading}
-                    className={`min-h-[30px] px-2.5 py-1 rounded-lg text-[11px] font-bold transition disabled:opacity-40 ${
-                      isFixing
-                        ? "bg-[#c9a84c] text-[#080c18]"
-                        : isFirstMatch
-                        ? "bg-[#1565C0]/10 border border-[#1565C0]/40 text-[#1565C0] hover:bg-[#1565C0]/20"
-                        : "bg-[#1a1f32] text-neutral-300 hover:text-[#c9a84c] hover:border-[#c9a84c]/40 border border-[#1a1f32]"
-                    }`}
-                  >
-                    FIX
-                  </button>
+                  {isSuggested ? (
+                    <>
+                      {/* CONFIRM — accept AI suggestion */}
+                      <button
+                        onClick={() => handleConfirm(item)}
+                        disabled={isConfirmLoading || isRejectLoading || isLoading}
+                        title="Confirm this AI suggestion"
+                        className="min-h-[30px] px-2.5 py-1 rounded-lg text-[11px] font-bold transition disabled:opacity-40 bg-amber-500 text-white hover:bg-amber-600 flex items-center gap-1"
+                      >
+                        {isConfirmLoading ? <Spinner size="sm" /> : (
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        )}
+                        CONFIRM
+                      </button>
 
-                  {/* APPROVE */}
-                  <button
-                    onClick={() => handleApprove(item)}
-                    disabled={isLoading || isNotItemLoading || !hasMatch}
-                    title={!hasMatch ? "No match to approve" : "Approve this match"}
-                    className={`min-h-[30px] px-2.5 py-1 border rounded-lg text-[11px] font-bold transition disabled:opacity-40 flex items-center gap-1 ${
-                      isFirstMatch
-                        ? "bg-[#1565C0]/10 border-[#1565C0]/40 text-[#1565C0] hover:bg-[#28a745]/10 hover:border-[#28a745]/40 hover:text-[#28a745]"
-                        : "bg-[#1a1f32] border-[#1a1f32] text-neutral-300 hover:text-[#28a745] hover:border-[#28a745]/40"
-                    }`}
-                  >
-                    {isLoading ? <Spinner size="sm" /> : (
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
-                    )}
-                  </button>
+                      {/* REJECT — clear suggestion, reset to Unmatched */}
+                      <button
+                        onClick={() => handleReject(item)}
+                        disabled={isRejectLoading || isConfirmLoading || isLoading}
+                        title="Reject this suggestion — reset to Unmatched"
+                        className="min-h-[30px] px-2.5 py-1 rounded-lg text-[11px] font-bold transition disabled:opacity-40 bg-[#1a1f32] border border-amber-500/40 text-amber-600 hover:bg-amber-50 flex items-center gap-1"
+                      >
+                        {isRejectLoading ? <Spinner size="sm" /> : (
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        )}
+                        REJECT
+                      </button>
 
-                  {/* NOT ITEM */}
-                  <button
-                    onClick={() => handleNotItem(item)}
-                    disabled={isLoading || isNotItemLoading}
-                    title="Mark as junk / not a real item"
-                    className={`min-h-[30px] px-2.5 py-1 border rounded-lg text-[11px] font-bold transition disabled:opacity-40 flex items-center gap-1 ${
-                      isFirstMatch
-                        ? "bg-[#1565C0]/10 border-[#1565C0]/40 text-[#1565C0] hover:bg-[#dc3545]/10 hover:border-[#dc3545]/40 hover:text-[#dc3545]"
-                        : "bg-[#1a1f32] border-[#1a1f32] text-neutral-300 hover:text-[#dc3545] hover:border-[#dc3545]/40"
-                    }`}
-                  >
-                    {isNotItemLoading ? <Spinner size="sm" /> : (
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    )}
-                  </button>
+                      {/* FIX — pick a different item (correct-and-learn) */}
+                      <button
+                        onClick={() => setFixingRow(isFixing ? null : item.name)}
+                        disabled={isConfirmLoading || isRejectLoading || isLoading}
+                        className={`min-h-[30px] px-2.5 py-1 rounded-lg text-[11px] font-bold transition disabled:opacity-40 ${
+                          isFixing
+                            ? "bg-[#c9a84c] text-[#080c18]"
+                            : "bg-[#1a1f32] text-neutral-300 hover:text-[#c9a84c] hover:border-[#c9a84c]/40 border border-[#1a1f32]"
+                        }`}
+                      >
+                        FIX
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* FIX */}
+                      <button
+                        onClick={() => setFixingRow(isFixing ? null : item.name)}
+                        disabled={isLoading || isNotItemLoading}
+                        className={`min-h-[30px] px-2.5 py-1 rounded-lg text-[11px] font-bold transition disabled:opacity-40 ${
+                          isFixing
+                            ? "bg-[#c9a84c] text-[#080c18]"
+                            : isFirstMatch
+                            ? "bg-[#1565C0]/10 border border-[#1565C0]/40 text-[#1565C0] hover:bg-[#1565C0]/20"
+                            : "bg-[#1a1f32] text-neutral-300 hover:text-[#c9a84c] hover:border-[#c9a84c]/40 border border-[#1a1f32]"
+                        }`}
+                      >
+                        FIX
+                      </button>
 
-                  {/* NEW PART */}
-                  {!hasMatch && (
-                    <button
-                      onClick={() => setNewPartItem(item)}
-                      disabled={isLoading || isNotItemLoading}
-                      title="Submit as a new part request"
-                      className="min-h-[30px] px-2.5 py-1 rounded-lg text-[11px] font-semibold transition disabled:opacity-40 bg-[#E67E22] text-white hover:bg-[#D35400]"
-                    >
-                      + New Part
-                    </button>
+                      {/* APPROVE */}
+                      <button
+                        onClick={() => handleApprove(item)}
+                        disabled={isLoading || isNotItemLoading || !hasMatch}
+                        title={!hasMatch ? "No match to approve" : "Approve this match"}
+                        className={`min-h-[30px] px-2.5 py-1 border rounded-lg text-[11px] font-bold transition disabled:opacity-40 flex items-center gap-1 ${
+                          isFirstMatch
+                            ? "bg-[#1565C0]/10 border-[#1565C0]/40 text-[#1565C0] hover:bg-[#28a745]/10 hover:border-[#28a745]/40 hover:text-[#28a745]"
+                            : "bg-[#1a1f32] border-[#1a1f32] text-neutral-300 hover:text-[#28a745] hover:border-[#28a745]/40"
+                        }`}
+                      >
+                        {isLoading ? <Spinner size="sm" /> : (
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </button>
+
+                      {/* NOT ITEM */}
+                      <button
+                        onClick={() => handleNotItem(item)}
+                        disabled={isLoading || isNotItemLoading}
+                        title="Mark as junk / not a real item"
+                        className={`min-h-[30px] px-2.5 py-1 border rounded-lg text-[11px] font-bold transition disabled:opacity-40 flex items-center gap-1 ${
+                          isFirstMatch
+                            ? "bg-[#1565C0]/10 border-[#1565C0]/40 text-[#1565C0] hover:bg-[#dc3545]/10 hover:border-[#dc3545]/40 hover:text-[#dc3545]"
+                            : "bg-[#1a1f32] border-[#1a1f32] text-neutral-300 hover:text-[#dc3545] hover:border-[#dc3545]/40"
+                        }`}
+                      >
+                        {isNotItemLoading ? <Spinner size="sm" /> : (
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        )}
+                      </button>
+
+                      {/* NEW PART */}
+                      {!hasMatch && (
+                        <button
+                          onClick={() => setNewPartItem(item)}
+                          disabled={isLoading || isNotItemLoading}
+                          title="Submit as a new part request"
+                          className="min-h-[30px] px-2.5 py-1 rounded-lg text-[11px] font-semibold transition disabled:opacity-40 bg-[#E67E22] text-white hover:bg-[#D35400]"
+                        >
+                          + New Part
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -535,26 +673,40 @@ export function MatchesTab({ onCountChange }: MatchesTabProps) {
                   />
                   <div className="flex-1 min-w-0">
                     {item.product_code && (
-                      <p className={`text-[11px] font-mono font-bold mb-0.5 ${isFirstMatch ? "text-[#1565C0]" : "text-[#c9a84c]"}`}>
+                      <p className={`text-[11px] font-mono font-bold mb-0.5 ${isSuggested ? "text-[#B45309]" : isFirstMatch ? "text-[#1565C0]" : "text-[#c9a84c]"}`}>
                         {item.product_code}
                       </p>
                     )}
-                    <p className={`text-sm leading-snug ${isFirstMatch ? "text-[#1565C0]" : "text-[#f0ebe0]"}`}>{item.description}</p>
-                    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] ${isFirstMatch ? "text-[#1565C0]/70" : "text-neutral-500"}`}>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className={`text-sm leading-snug ${isSuggested ? "text-[#92400E]" : isFirstMatch ? "text-[#1565C0]" : "text-[#f0ebe0]"}`}>{item.description}</p>
+                      {isSuggested && (
+                        <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded-full font-bold">
+                          SUGGESTED
+                        </span>
+                      )}
+                    </div>
+                    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] ${isSuggested ? "text-[#B45309]/70" : isFirstMatch ? "text-[#1565C0]/70" : "text-neutral-500"}`}>
                       <span>{item.supplier || "—"}</span>
-                      {item.match_score > 0 && (
+                      {isSuggested && (item.suggestion_score ?? 0) > 0 ? (
+                        <span className="font-bold text-amber-600">{Math.round(item.suggestion_score ?? 0)}%?</span>
+                      ) : item.match_score > 0 ? (
                         <span className={`font-bold ${scoreColor(item.match_score)}`}>
                           {Math.round(item.match_score)}%
                         </span>
-                      )}
+                      ) : null}
                       <span>{fmtDate(item.receipt_date)}</span>
                     </div>
-                    {hasMatch && (
+                    {isSuggested && (
+                      <p className="text-[11px] mt-1.5 font-mono break-all text-amber-700">
+                        Suggested: {item.suggested_item_name || item.suggested_item}
+                      </p>
+                    )}
+                    {!isSuggested && hasMatch && (
                       <p className={`text-[11px] mt-1.5 font-mono break-all ${isFirstMatch ? "text-[#1565C0]/80" : "text-neutral-400"}`}>
                         Match: {item.matched_item}
                       </p>
                     )}
-                    {!hasMatch && (
+                    {!isSuggested && !hasMatch && (
                       <p className={`text-[11px] mt-1.5 italic ${isFirstMatch ? "text-[#1565C0]/50" : "text-neutral-600"}`}>No match found</p>
                     )}
                   </div>
@@ -562,39 +714,69 @@ export function MatchesTab({ onCountChange }: MatchesTabProps) {
 
                 {/* Mobile action row */}
                 <div className="flex items-center gap-2 pl-7 flex-wrap">
-                  <button
-                    onClick={() => setFixingRow(isFixing ? null : item.name)}
-                    disabled={isLoading || isNotItemLoading}
-                    className={`flex-1 min-h-[34px] rounded-lg text-xs font-bold transition disabled:opacity-40 ${
-                      isFixing
-                        ? "bg-[#c9a84c] text-[#080c18]"
-                        : "bg-[#1a1f32] text-neutral-300 hover:text-[#c9a84c] border border-[#1a1f32]"
-                    }`}
-                  >
-                    FIX
-                  </button>
-                  <button
-                    onClick={() => handleApprove(item)}
-                    disabled={isLoading || isNotItemLoading || !hasMatch}
-                    className="min-h-[34px] px-3 bg-[#1a1f32] border border-[#1a1f32] text-neutral-300 hover:text-[#28a745] hover:border-[#28a745]/40 rounded-lg text-xs font-bold transition disabled:opacity-40 flex items-center gap-1.5"
-                  >
-                    {isLoading ? <Spinner size="sm" /> : "APPROVE"}
-                  </button>
-                  <button
-                    onClick={() => handleNotItem(item)}
-                    disabled={isLoading || isNotItemLoading}
-                    className="min-h-[34px] px-3 bg-[#1a1f32] border border-[#1a1f32] text-neutral-300 hover:text-[#dc3545] hover:border-[#dc3545]/40 rounded-lg text-xs font-bold transition disabled:opacity-40 flex items-center gap-1.5"
-                  >
-                    {isNotItemLoading ? <Spinner size="sm" /> : "NOT ITEM"}
-                  </button>
-                  {!hasMatch && (
-                    <button
-                      onClick={() => setNewPartItem(item)}
-                      disabled={isLoading || isNotItemLoading}
-                      className="min-h-[34px] px-3 bg-[#E67E22] hover:bg-[#D35400] text-white rounded-lg text-xs font-semibold transition disabled:opacity-40"
-                    >
-                      + New Part
-                    </button>
+                  {isSuggested ? (
+                    <>
+                      <button
+                        onClick={() => handleConfirm(item)}
+                        disabled={isConfirmLoading || isRejectLoading || isLoading}
+                        className="flex-1 min-h-[34px] rounded-lg text-xs font-bold transition disabled:opacity-40 bg-amber-500 text-white hover:bg-amber-600 flex items-center justify-center gap-1.5"
+                      >
+                        {isConfirmLoading ? <Spinner size="sm" /> : "CONFIRM"}
+                      </button>
+                      <button
+                        onClick={() => handleReject(item)}
+                        disabled={isRejectLoading || isConfirmLoading || isLoading}
+                        className="min-h-[34px] px-3 bg-[#1a1f32] border border-amber-500/40 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-bold transition disabled:opacity-40 flex items-center gap-1.5"
+                      >
+                        {isRejectLoading ? <Spinner size="sm" /> : "REJECT"}
+                      </button>
+                      <button
+                        onClick={() => setFixingRow(isFixing ? null : item.name)}
+                        disabled={isConfirmLoading || isRejectLoading || isLoading}
+                        className={`min-h-[34px] px-3 rounded-lg text-xs font-bold transition disabled:opacity-40 ${
+                          isFixing ? "bg-[#c9a84c] text-[#080c18]" : "bg-[#1a1f32] text-neutral-300 hover:text-[#c9a84c] border border-[#1a1f32]"
+                        }`}
+                      >
+                        FIX
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setFixingRow(isFixing ? null : item.name)}
+                        disabled={isLoading || isNotItemLoading}
+                        className={`flex-1 min-h-[34px] rounded-lg text-xs font-bold transition disabled:opacity-40 ${
+                          isFixing
+                            ? "bg-[#c9a84c] text-[#080c18]"
+                            : "bg-[#1a1f32] text-neutral-300 hover:text-[#c9a84c] border border-[#1a1f32]"
+                        }`}
+                      >
+                        FIX
+                      </button>
+                      <button
+                        onClick={() => handleApprove(item)}
+                        disabled={isLoading || isNotItemLoading || !hasMatch}
+                        className="min-h-[34px] px-3 bg-[#1a1f32] border border-[#1a1f32] text-neutral-300 hover:text-[#28a745] hover:border-[#28a745]/40 rounded-lg text-xs font-bold transition disabled:opacity-40 flex items-center gap-1.5"
+                      >
+                        {isLoading ? <Spinner size="sm" /> : "APPROVE"}
+                      </button>
+                      <button
+                        onClick={() => handleNotItem(item)}
+                        disabled={isLoading || isNotItemLoading}
+                        className="min-h-[34px] px-3 bg-[#1a1f32] border border-[#1a1f32] text-neutral-300 hover:text-[#dc3545] hover:border-[#dc3545]/40 rounded-lg text-xs font-bold transition disabled:opacity-40 flex items-center gap-1.5"
+                      >
+                        {isNotItemLoading ? <Spinner size="sm" /> : "NOT ITEM"}
+                      </button>
+                      {!hasMatch && (
+                        <button
+                          onClick={() => setNewPartItem(item)}
+                          disabled={isLoading || isNotItemLoading}
+                          className="min-h-[34px] px-3 bg-[#E67E22] hover:bg-[#D35400] text-white rounded-lg text-xs font-semibold transition disabled:opacity-40"
+                        >
+                          + New Part
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -603,7 +785,7 @@ export function MatchesTab({ onCountChange }: MatchesTabProps) {
               {isFixing && (
                 <div className="px-4 pb-4 md:pl-[52px]">
                   <PricebookSearch
-                    onSelect={(result) => handleCorrect(item, result)}
+                    onSelect={(result) => isSuggested ? handleCorrectSuggested(item, result) : handleCorrect(item, result)}
                     onCancel={() => setFixingRow(null)}
                   />
                 </div>
