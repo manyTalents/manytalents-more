@@ -6,7 +6,7 @@ import type { ItemDestination } from "@/lib/inventory-api";
 
 // ── Types ─────────────────────────────────────
 
-export type MainTab = "receipts" | "warehouses" | "limbo" | "restock" | "matches";
+export type MainTab = "receipts" | "warehouses" | "limbo" | "restock" | "matches" | "mappings";
 export type StatusFilter = "" | "Pending" | "Complete" | "Failed";
 export type ViewMode = "table" | "cards";
 

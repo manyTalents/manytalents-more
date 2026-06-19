@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAuth } from "@/lib/frappe";
+import { getAuth, checkOfficeAccess } from "@/lib/frappe";
 import { getFeatureFlags } from "@/lib/features";
 import NavBar from "@/app/manager/components/NavBar";
 import { fetchPullSummary, fetchUnmatchedItems, type PullSummary } from "@/lib/inventory-api";
@@ -11,6 +11,7 @@ import { WarehousesTab } from "./components/WarehousesTab";
 import { LimboTab } from "./components/LimboTab";
 import { RestockTab } from "./components/RestockTab";
 import { MatchesTab } from "./components/MatchesTab";
+import { MappingsTab } from "./components/MappingsTab";
 import type { MainTab } from "./components/utils";
 
 // ── InventoryPage ─────────────────────────────
@@ -21,6 +22,7 @@ export default function InventoryPage() {
   const [summary, setSummary] = useState({ pending_receipts: 0, pending_limbo_items: 0, restock_items: 0 });
   const [restockBadge, setRestockBadge] = useState(0);
   const [matchesBadge, setMatchesBadge] = useState(0);
+  const [isOffice, setIsOffice] = useState(false);
 
   useEffect(() => {
     if (!getAuth()) {
@@ -43,6 +45,10 @@ export default function InventoryPage() {
     fetchUnmatchedItems(1, 1)
       .then((r) => setMatchesBadge(r.total_count))
       .catch(() => { /* non-critical */ });
+    // Check office access for Mappings tab visibility
+    checkOfficeAccess()
+      .then((res) => setIsOffice(res.is_office))
+      .catch(() => { /* non-critical — tab stays hidden */ });
   }, [router]);
 
   const TABS: { key: MainTab; label: string; badge?: number }[] = [
@@ -51,6 +57,7 @@ export default function InventoryPage() {
     { key: "limbo", label: "LIMBO", badge: summary.pending_limbo_items || undefined },
     { key: "restock", label: "RESTOCK", badge: restockBadge || undefined },
     { key: "matches", label: "MATCHES", badge: matchesBadge || undefined },
+    ...(isOffice ? [{ key: "mappings" as MainTab, label: "MAPPINGS" }] : []),
   ];
 
   return (
@@ -92,6 +99,7 @@ export default function InventoryPage() {
         {activeTab === "matches" && (
           <MatchesTab onCountChange={(n) => setMatchesBadge(n)} />
         )}
+        {activeTab === "mappings" && isOffice && <MappingsTab />}
       </main>
     </div>
   );
