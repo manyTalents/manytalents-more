@@ -33,8 +33,12 @@ import {
   jobClockIn,
   jobClockOut,
   getLinkedReceipts,
+  listTechs,
+  assignTech,
+  unassignTech,
   type EstimateSummary,
   type ClockStatusResult,
+  type TechListItem,
 } from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 import PaymentPanel from "@/app/manager/components/PaymentPanel";
@@ -211,6 +215,13 @@ export default function JobDetailPage() {
   const [receiptsModalOpen, setReceiptsModalOpen] = useState(false);
   const [receiptCount, setReceiptCount] = useState<number | null>(null);
 
+  // Tech assign/unassign
+  const [techList, setTechList] = useState<TechListItem[]>([]);
+  const [techListLoaded, setTechListLoaded] = useState(false);
+  const [assigningTech, setAssigningTech] = useState(false);
+  const [techPickerOpen, setTechPickerOpen] = useState(false);
+  const [techError, setTechError] = useState("");
+
   const loadJob = () => {
     setLoading(true);
     getJobDetail(jobName)
@@ -368,6 +379,44 @@ export default function JobDetailPage() {
     }
   };
 
+  const openTechPicker = () => {
+    if (!techListLoaded) {
+      listTechs()
+        .then((list) => { setTechList(list); setTechListLoaded(true); })
+        .catch(() => setTechError("Could not load tech list"));
+    }
+    setTechPickerOpen(true);
+    setTechError("");
+  };
+
+  const handleAssignTech = async (techEmail: string) => {
+    setAssigningTech(true);
+    setTechError("");
+    try {
+      await assignTech(jobName, techEmail);
+      setTechPickerOpen(false);
+      loadJob();
+    } catch (err: unknown) {
+      setTechError(getErrorMessage(err) || "Could not assign tech");
+    } finally {
+      setAssigningTech(false);
+    }
+  };
+
+  const handleUnassignTech = async (techUser: string) => {
+    if (!confirm("Remove this tech from the job?")) return;
+    setAssigningTech(true);
+    setTechError("");
+    try {
+      await unassignTech(jobName, techUser);
+      loadJob();
+    } catch (err: unknown) {
+      setTechError(getErrorMessage(err) || "Could not unassign tech");
+    } finally {
+      setAssigningTech(false);
+    }
+  };
+
   const startEditingInfo = () => {
     setInfoFields({
       customer_name: job.customer_name || "",
@@ -379,6 +428,7 @@ export default function JobDetailPage() {
       occupant_name: job.occupant_name || "",
       occupant_phone: job.occupant_phone || "",
       customer_phone: job.customer_phone || "",
+      hcp_job_id: job.hcp_job_id || "",
     });
     setEditingInfo(true);
   };
@@ -390,6 +440,7 @@ export default function JobDetailPage() {
       const EDITABLE_FIELDS = [
         "customer_name", "address", "town", "description",
         "job_type", "priority", "occupant_name", "occupant_phone", "customer_phone",
+        "hcp_job_id",
       ];
       const saves = EDITABLE_FIELDS.filter(
         (f) => (infoFields[f] ?? "") !== (job[f] ?? "")
@@ -705,6 +756,18 @@ export default function JobDetailPage() {
                     }
                     rows={3}
                     className="w-full bg-navy border border-navy-border rounded px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark transition resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-neutral-500 mb-1">HCP Job # (for reconciliation)</label>
+                  <input
+                    type="text"
+                    value={infoFields["hcp_job_id"] ?? ""}
+                    onChange={(e) =>
+                      setInfoFields((prev) => ({ ...prev, hcp_job_id: e.target.value }))
+                    }
+                    placeholder="Legacy HCP job number"
+                    className="w-full bg-navy border border-navy-border rounded px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark transition"
                   />
                 </div>
               </div>
@@ -1258,28 +1321,98 @@ export default function JobDetailPage() {
         </div>
 
         {/* Assigned techs */}
-        {job.assigned_techs && job.assigned_techs.length > 0 && (
-          <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
-            <p className="text-xs uppercase tracking-wider text-neutral-400 mb-3">
+        <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs uppercase tracking-wider text-neutral-400">
               Assigned Techs
             </p>
-            <div className="flex flex-wrap gap-3">
+            <button
+              onClick={openTechPicker}
+              disabled={assigningTech}
+              className="text-xs text-gold hover:text-gold-light transition disabled:opacity-50"
+            >
+              + Assign tech
+            </button>
+          </div>
+
+          {techError && (
+            <p className="text-xs text-red-400 mb-3">{techError}</p>
+          )}
+
+          {/* Current assigned techs */}
+          {job.assigned_techs && job.assigned_techs.length > 0 ? (
+            <div className="flex flex-wrap gap-3 mb-3">
               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
               {job.assigned_techs.map((t: any, i: number) => (
                 <div
                   key={i}
-                  className="bg-navy border border-navy-border rounded-lg px-4 py-3"
+                  className="bg-navy border border-navy-border rounded-lg px-4 py-3 flex items-start gap-3"
                 >
-                  <p className="text-sm font-medium text-cream">{t.tech_name}</p>
-                  <p className="text-xs text-neutral-500">
-                    {t.role || "Tech"}
-                    {t.van_warehouse ? ` · ${t.van_warehouse}` : ""}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-cream">{t.tech_name}</p>
+                    <p className="text-xs text-neutral-500">
+                      {t.role || "Tech"}
+                      {t.van_warehouse ? ` · ${t.van_warehouse}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleUnassignTech(t.tech_user)}
+                    disabled={assigningTech}
+                    className="text-xs text-neutral-500 hover:text-red-400 transition disabled:opacity-40 mt-0.5 flex-shrink-0"
+                    title="Remove tech"
+                  >
+                    Remove
+                  </button>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-sm text-neutral-500 mb-3">No techs assigned.</p>
+          )}
+
+          {/* Inline tech picker */}
+          {techPickerOpen && (
+            <div className="border-t border-navy-border pt-3 mt-1">
+              <p className="text-xs text-neutral-500 mb-2">Select a tech to assign:</p>
+              {!techListLoaded ? (
+                <div className="flex items-center gap-2 py-2">
+                  <div className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+                  <span className="text-xs text-neutral-500">Loading...</span>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {techList
+                    .filter((t) => {
+                      const alreadyAssigned = (job.assigned_techs ?? []) as Array<{ tech_user: string }>;
+                      return !alreadyAssigned.some((a) => a.tech_user === t.email);
+                    })
+                    .map((tech) => (
+                      <button
+                        key={tech.email}
+                        onClick={() => handleAssignTech(tech.email)}
+                        disabled={assigningTech}
+                        className="px-3 py-1.5 rounded-full text-sm border border-navy-border text-neutral-300 hover:border-gold-dark hover:text-gold transition disabled:opacity-50"
+                      >
+                        {tech.name}
+                      </button>
+                    ))}
+                  {techList.filter((t) => {
+                    const alreadyAssigned = (job.assigned_techs ?? []) as Array<{ tech_user: string }>;
+                    return !alreadyAssigned.some((a) => a.tech_user === t.email);
+                  }).length === 0 && (
+                    <p className="text-xs text-neutral-500">All techs are already assigned.</p>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={() => setTechPickerOpen(false)}
+                className="text-xs text-neutral-500 hover:text-cream mt-3 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Time Logs */}
         {(() => {

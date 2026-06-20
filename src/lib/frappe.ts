@@ -407,6 +407,17 @@ export async function assignTech(
   });
 }
 
+/** Unassign a tech (by user email) from a job. */
+export async function unassignTech(
+  jobName: string,
+  techUser: string
+): Promise<{ status: string }> {
+  return await callMethod(`${API}.unassign_tech`, {
+    job_name: jobName,
+    tech_user: techUser,
+  });
+}
+
 // ──────────────────────────────────────────────
 // Access Approvers management
 // ──────────────────────────────────────────────
