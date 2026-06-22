@@ -12,6 +12,7 @@ import {
   markInvoiced,
   markPaid,
   revertWithNote,
+  updateJobStatus,
   updateJobServices,
   getDefaultLaborRate,
   getEstimateList,
@@ -133,6 +134,23 @@ const WORKFLOW_ACTIONS: Record<string, WorkflowAction[]> = {
       secondary: true,
       sendBack: "Checked",
     },
+  ],
+  // Active-status actions — web parity so the office can finish/unschedule from the computer
+  Entered: [
+    { label: "Finish Job", action: (n) => updateJobStatus(n, "Completed"), color: "from-purple-600 to-purple-700", confirm: "Mark this job finished (Completed) and send it for office review?" },
+  ],
+  Assigned: [
+    { label: "Finish Job", action: (n) => updateJobStatus(n, "Completed"), color: "from-purple-600 to-purple-700", confirm: "Mark this job finished (Completed) and send it for office review?" },
+  ],
+  Scheduled: [
+    { label: "Finish Job", action: (n) => updateJobStatus(n, "Completed"), color: "from-purple-600 to-purple-700", confirm: "Mark this job finished (Completed) and send it for office review?" },
+    { label: "Unschedule", action: (n) => updateJobStatus(n, "Assigned"), color: "from-neutral-600 to-neutral-700", secondary: true },
+  ],
+  "In Progress": [
+    { label: "Finish Job", action: (n) => updateJobStatus(n, "Completed"), color: "from-purple-600 to-purple-700", confirm: "Mark this job finished (Completed) and send it for office review?" },
+  ],
+  "On Hold": [
+    { label: "Finish Job", action: (n) => updateJobStatus(n, "Completed"), color: "from-purple-600 to-purple-700", confirm: "Mark this job finished (Completed) and send it for office review?" },
   ],
 };
 
@@ -593,6 +611,14 @@ export default function JobDetailPage() {
               #{job.hcp_job_id} · {job.name}
             </p>
           </div>
+          <a
+            href={`${(getAuth()?.siteUrl || "https://erp.manytalentsmore.com").replace(/\/+$/, "")}/printview?doctype=${job.sales_invoice ? "Sales%20Invoice" : "HCP%20Job"}&name=${encodeURIComponent((job.sales_invoice as string) || job.name)}&trigger_print=1&format=Standard&no_letterhead=0`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm px-3 py-1 rounded-lg border border-navy-border text-neutral-300 hover:text-cream hover:border-gold transition whitespace-nowrap"
+          >
+            🖨 Print {job.sales_invoice ? "Invoice" : "Work Order"}
+          </a>
           <span
             className={`text-sm px-3 py-1 rounded-full font-medium ${
               STATUS_COLORS[job.status] || "bg-neutral-700 text-neutral-300"

@@ -147,6 +147,11 @@ export async function revertStatus(jobName: string, targetStatus: string) {
   return await callMethod(`${API}.revert_status`, { job_name: jobName, target_status: targetStatus });
 }
 
+/** Set a job's status directly (forward moves like Finish/Unschedule). Backend validates + role-gates office-only statuses. */
+export async function updateJobStatus(jobName: string, status: string) {
+  return await callMethod(`${API}.update_job_status`, { job_name: jobName, status });
+}
+
 export async function addJobNote(jobName: string, noteText: string) {
   return await callMethod(`${API}.add_job_note`, { job_name: jobName, note_text: noteText });
 }
