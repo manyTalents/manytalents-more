@@ -46,6 +46,7 @@ import NavBar from "@/app/manager/components/NavBar";
 import PaymentPanel from "@/app/manager/components/PaymentPanel";
 import JobReceiptsModal from "@/app/manager/components/JobReceiptsModal";
 import { getErrorMessage } from "@/lib/errors";
+import { useInvoicedEditGuard } from "./useInvoicedEditGuard";
 
 const STATUS_COLORS: Record<string, string> = {
   Entered: "bg-neutral-700 text-neutral-300",
@@ -250,6 +251,9 @@ export default function JobDetailPage() {
   const [techPickerOpen, setTechPickerOpen] = useState(false);
   const [techError, setTechError] = useState("");
 
+  // Invoiced-edit guard — prompts for a change reason on Invoiced jobs
+  const { guardedAction, GuardModal, isInvoiced } = useInvoicedEditGuard(job?.status);
+
   const loadJob = () => {
     setLoading(true);
     getJobDetail(jobName)
@@ -331,26 +335,29 @@ export default function JobDetailPage() {
     setServiceRows(updated);
   };
 
-  const saveServices = async () => {
-    setSavingServices(true);
-    setError("");
-    try {
-      const cleaned = serviceRows
-        .filter((r) => parseFloat(r.qty) > 0 || parseFloat(r.rate) > 0)
-        .map((r) => ({
-          description: r.description || "Labor",
-          qty: parseFloat(r.qty) || 0,
-          rate: parseFloat(r.rate) || 0,
-        }));
-      await updateJobServices(jobName, cleaned);
-      setEditingServices(false);
-      setActionResult("Services updated");
-      loadJob();
-    } catch (err: unknown) {
-      setError(getErrorMessage(err) || "Could not save services");
-    } finally {
-      setSavingServices(false);
-    }
+  const saveServices = () => {
+    guardedAction(async (changeReason) => {
+      setSavingServices(true);
+      setError("");
+      try {
+        const cleaned = serviceRows
+          .filter((r) => parseFloat(r.qty) > 0 || parseFloat(r.rate) > 0)
+          .map((r) => ({
+            description: r.description || "Labor",
+            qty: parseFloat(r.qty) || 0,
+            rate: parseFloat(r.rate) || 0,
+          }));
+        await updateJobServices(jobName, cleaned, changeReason);
+        setEditingServices(false);
+        setActionResult("Services updated");
+        loadJob();
+      } catch (err: unknown) {
+        setError(getErrorMessage(err) || "Could not save services");
+        throw err;
+      } finally {
+        setSavingServices(false);
+      }
+    });
   };
 
   const handleAction = async (
@@ -466,42 +473,48 @@ export default function JobDetailPage() {
     setEditingInfo(true);
   };
 
-  const saveInfo = async () => {
-    setSavingInfo(true);
-    setError("");
-    try {
-      const EDITABLE_FIELDS = [
-        "customer_name", "address", "town", "description",
-        "job_type", "priority", "occupant_name", "occupant_phone", "customer_phone",
-        "hcp_job_id",
-      ];
-      const saves = EDITABLE_FIELDS.filter(
-        (f) => (infoFields[f] ?? "") !== (job[f] ?? "")
-      ).map((f) => saveJobField(jobName, f, infoFields[f]));
-      await Promise.all(saves);
-      setEditingInfo(false);
-      setActionResult("Job info updated");
-      loadJob();
-    } catch (err: unknown) {
-      setError(getErrorMessage(err) || "Could not save job info");
-    } finally {
-      setSavingInfo(false);
-    }
+  const saveInfo = () => {
+    guardedAction(async (changeReason) => {
+      setSavingInfo(true);
+      setError("");
+      try {
+        const EDITABLE_FIELDS = [
+          "customer_name", "address", "town", "description",
+          "job_type", "priority", "occupant_name", "occupant_phone", "customer_phone",
+          "hcp_job_id",
+        ];
+        const saves = EDITABLE_FIELDS.filter(
+          (f) => (infoFields[f] ?? "") !== (job[f] ?? "")
+        ).map((f) => saveJobField(jobName, f, infoFields[f], changeReason));
+        await Promise.all(saves);
+        setEditingInfo(false);
+        setActionResult("Job info updated");
+        loadJob();
+      } catch (err: unknown) {
+        setError(getErrorMessage(err) || "Could not save job info");
+        throw err;
+      } finally {
+        setSavingInfo(false);
+      }
+    });
   };
 
-  const handleAddNote = async () => {
+  const handleAddNote = () => {
     if (!noteText.trim()) return;
-    setSavingNote(true);
-    setError("");
-    try {
-      await addJobNote(jobName, noteText.trim());
-      setNoteText("");
-      loadJob();
-    } catch (err: unknown) {
-      setError(getErrorMessage(err) || "Could not add note");
-    } finally {
-      setSavingNote(false);
-    }
+    guardedAction(async (changeReason) => {
+      setSavingNote(true);
+      setError("");
+      try {
+        await addJobNote(jobName, noteText.trim(), changeReason);
+        setNoteText("");
+        loadJob();
+      } catch (err: unknown) {
+        setError(getErrorMessage(err) || "Could not add note");
+        throw err;
+      } finally {
+        setSavingNote(false);
+      }
+    });
   };
 
   const fmtCurrency = (n: number) =>
@@ -669,6 +682,17 @@ export default function JobDetailPage() {
         {error && (
           <div className="bg-red-950/40 border border-red-900/60 rounded-lg px-4 py-3 text-sm text-red-300">
             {error}
+          </div>
+        )}
+
+        {/* Invoiced-job warning banner */}
+        {isInvoiced && (
+          <div className="bg-amber-950/40 border border-amber-700/60 rounded-lg px-4 py-3 text-sm text-amber-300 flex items-start gap-2">
+            <span className="flex-shrink-0 mt-0.5" aria-hidden="true">&#9888;</span>
+            <span>
+              This job has been invoiced. Any edits to services, materials, notes, or job info
+              will require a reason — and the invoice may need to be regenerated.
+            </span>
           </div>
         )}
 
@@ -1683,11 +1707,18 @@ export default function JobDetailPage() {
                               onBlur={(e) => {
                                 const val = parseFloat(e.target.value);
                                 if (!isNaN(val) && val !== m.quantity) {
-                                  setSavingMaterials(true);
-                                  updateMaterialQty(jobName, m.name, val)
-                                    .then(() => loadJob())
-                                    .catch((err: unknown) => setError(getErrorMessage(err) || "Could not update qty"))
-                                    .finally(() => setSavingMaterials(false));
+                                  guardedAction(async (changeReason) => {
+                                    setSavingMaterials(true);
+                                    try {
+                                      await updateMaterialQty(jobName, m.name, val, changeReason);
+                                      loadJob();
+                                    } catch (err: unknown) {
+                                      setError(getErrorMessage(err) || "Could not update qty");
+                                      throw err;
+                                    } finally {
+                                      setSavingMaterials(false);
+                                    }
+                                  });
                                 }
                               }}
                               className="w-16 bg-navy border border-navy-border rounded px-2 py-1 text-sm text-cream text-right focus:outline-none focus:border-gold-dark"
@@ -1702,11 +1733,18 @@ export default function JobDetailPage() {
                               onBlur={(e) => {
                                 const val = parseFloat(e.target.value);
                                 if (!isNaN(val) && val !== m.cost_rate) {
-                                  setSavingMaterials(true);
-                                  updateMaterialRate(jobName, m.name, val)
-                                    .then(() => loadJob())
-                                    .catch((err: unknown) => setError(getErrorMessage(err) || "Could not update rate"))
-                                    .finally(() => setSavingMaterials(false));
+                                  guardedAction(async (changeReason) => {
+                                    setSavingMaterials(true);
+                                    try {
+                                      await updateMaterialRate(jobName, m.name, val, changeReason);
+                                      loadJob();
+                                    } catch (err: unknown) {
+                                      setError(getErrorMessage(err) || "Could not update rate");
+                                      throw err;
+                                    } finally {
+                                      setSavingMaterials(false);
+                                    }
+                                  });
                                 }
                               }}
                               className="w-20 bg-navy border border-navy-border rounded px-2 py-1 text-sm text-cream text-right focus:outline-none focus:border-gold-dark"
@@ -1719,11 +1757,18 @@ export default function JobDetailPage() {
                             <button
                               onClick={() => {
                                 if (!confirm(`Remove ${m.item_name || m.item}?`)) return;
-                                setSavingMaterials(true);
-                                removeMaterial(jobName, m.name)
-                                  .then(() => loadJob())
-                                  .catch((err: unknown) => setError(getErrorMessage(err) || "Could not remove material"))
-                                  .finally(() => setSavingMaterials(false));
+                                guardedAction(async (changeReason) => {
+                                  setSavingMaterials(true);
+                                  try {
+                                    await removeMaterial(jobName, m.name, changeReason);
+                                    loadJob();
+                                  } catch (err: unknown) {
+                                    setError(getErrorMessage(err) || "Could not remove material");
+                                    throw err;
+                                  } finally {
+                                    setSavingMaterials(false);
+                                  }
+                                });
                               }}
                               className="text-neutral-600 hover:text-red-400 text-lg leading-none"
                               title="Remove"
@@ -1783,16 +1828,21 @@ export default function JobDetailPage() {
                       <li key={item.name}>
                         <button
                           onClick={() => {
-                            setAddingMaterial(true);
-                            addMaterial(jobName, item.name, parseFloat(pendingAddQty) || 1, "office", "")
-                              .then(() => {
+                            guardedAction(async (changeReason) => {
+                              setAddingMaterial(true);
+                              try {
+                                await addMaterial(jobName, item.name, parseFloat(pendingAddQty) || 1, "office", "", changeReason);
                                 setMaterialSearch("");
                                 setMaterialSearchResults([]);
                                 setPendingAddQty("1");
                                 loadJob();
-                              })
-                              .catch((err: unknown) => setError(getErrorMessage(err) || "Could not add material"))
-                              .finally(() => setAddingMaterial(false));
+                              } catch (err: unknown) {
+                                setError(getErrorMessage(err) || "Could not add material");
+                                throw err;
+                              } finally {
+                                setAddingMaterial(false);
+                              }
+                            });
                           }}
                           disabled={addingMaterial}
                           className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-navy-surface transition text-sm disabled:opacity-50"
@@ -1865,28 +1915,32 @@ export default function JobDetailPage() {
                         </div>
                         <div className="flex gap-2">
                           <button
-                            onClick={async () => {
+                            onClick={() => {
                               if (!customPartName.trim() || !customPartPrice) return;
-                              setAddingCustomPart(true);
-                              try {
-                                await addCustomMaterial(
-                                  jobName,
-                                  customPartName.trim(),
-                                  parseFloat(customPartPrice),
-                                  parseInt(customPartQty) || 1
-                                );
-                                setShowCustomPartForm(false);
-                                setCustomPartName("");
-                                setCustomPartPrice("");
-                                setCustomPartQty("1");
-                                setMaterialSearch("");
-                                setMaterialSearchResults([]);
-                                loadJob();
-                              } catch (err: unknown) {
-                                setError(getErrorMessage(err) || "Could not add custom part");
-                              } finally {
-                                setAddingCustomPart(false);
-                              }
+                              guardedAction(async (changeReason) => {
+                                setAddingCustomPart(true);
+                                try {
+                                  await addCustomMaterial(
+                                    jobName,
+                                    customPartName.trim(),
+                                    parseFloat(customPartPrice),
+                                    parseInt(customPartQty) || 1,
+                                    changeReason
+                                  );
+                                  setShowCustomPartForm(false);
+                                  setCustomPartName("");
+                                  setCustomPartPrice("");
+                                  setCustomPartQty("1");
+                                  setMaterialSearch("");
+                                  setMaterialSearchResults([]);
+                                  loadJob();
+                                } catch (err: unknown) {
+                                  setError(getErrorMessage(err) || "Could not add custom part");
+                                  throw err;
+                                } finally {
+                                  setAddingCustomPart(false);
+                                }
+                              });
                             }}
                             disabled={addingCustomPart || !customPartName.trim() || !customPartPrice}
                             className="flex-1 bg-gold-dark text-navy font-bold text-sm py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50"
@@ -2064,6 +2118,9 @@ export default function JobDetailPage() {
           />
         )}
       </main>
+
+      {/* Invoiced-edit reason modal */}
+      <GuardModal />
 
       {/* Send-back modal */}
       {sendBackTarget && (

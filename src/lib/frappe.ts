@@ -152,8 +152,12 @@ export async function updateJobStatus(jobName: string, status: string) {
   return await callMethod(`${API}.update_job_status`, { job_name: jobName, status });
 }
 
-export async function addJobNote(jobName: string, noteText: string) {
-  return await callMethod(`${API}.add_job_note`, { job_name: jobName, note_text: noteText });
+export async function addJobNote(jobName: string, noteText: string, changeReason?: string) {
+  return await callMethod(`${API}.add_job_note`, {
+    job_name: jobName,
+    note_text: noteText,
+    ...(changeReason ? { change_reason: changeReason } : {}),
+  });
 }
 
 /** Revert status AND add a note explaining why */
@@ -199,16 +203,23 @@ export async function createJob(params: {
 
 export async function updateJobServices(
   jobName: string,
-  services: Array<{ description: string; qty: number; rate: number }>
+  services: Array<{ description: string; qty: number; rate: number }>,
+  changeReason?: string
 ): Promise<unknown> {
   return await callMethod(`${API}.update_job_services`, {
     job_name: jobName,
     services: JSON.stringify(services),
+    ...(changeReason ? { change_reason: changeReason } : {}),
   });
 }
 
-export async function saveJobField(jobName: string, field: string, value: string): Promise<unknown> {
-  return callMethod(`${API}.save_job_field`, { job_name: jobName, field, value });
+export async function saveJobField(jobName: string, field: string, value: string, changeReason?: string): Promise<unknown> {
+  return callMethod(`${API}.save_job_field`, {
+    job_name: jobName,
+    field,
+    value,
+    ...(changeReason ? { change_reason: changeReason } : {}),
+  });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe search returns untyped records
@@ -967,8 +978,15 @@ export async function searchPricebook(query: string, limit = 20): Promise<Array<
   return callMethod(`${MATERIALS_API}.search_pricebook`, { query, limit });
 }
 
-export async function addMaterial(jobName: string, item: string, quantity: number, source: string, warehouse: string): Promise<{ status: string; total_material_cost: number }> {
-  return callMethod(`${MATERIALS_API}.add_material`, { job_name: jobName, item, quantity, source, warehouse });
+export async function addMaterial(jobName: string, item: string, quantity: number, source: string, warehouse: string, changeReason?: string): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.add_material`, {
+    job_name: jobName,
+    item,
+    quantity,
+    source,
+    warehouse,
+    ...(changeReason ? { change_reason: changeReason } : {}),
+  });
 }
 
 /** Add a custom (non-pricebook) part to a job by name + price. Backend: add_custom_material. */
@@ -976,26 +994,42 @@ export async function addCustomMaterial(
   jobName: string,
   partName: string,
   price: number,
-  quantity: number = 1
+  quantity: number = 1,
+  changeReason?: string
 ): Promise<{ status: string; total_material_cost: number }> {
   return callMethod(`${MATERIALS_API}.add_custom_material`, {
     job_name: jobName,
     part_name: partName,
     price,
     quantity,
+    ...(changeReason ? { change_reason: changeReason } : {}),
   });
 }
 
-export async function removeMaterial(jobName: string, rowName: string): Promise<{ status: string; total_material_cost: number }> {
-  return callMethod(`${MATERIALS_API}.remove_material`, { job_name: jobName, row_name: rowName });
+export async function removeMaterial(jobName: string, rowName: string, changeReason?: string): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.remove_material`, {
+    job_name: jobName,
+    row_name: rowName,
+    ...(changeReason ? { change_reason: changeReason } : {}),
+  });
 }
 
-export async function updateMaterialQty(jobName: string, rowName: string, quantity: number): Promise<{ status: string; total_material_cost: number }> {
-  return callMethod(`${MATERIALS_API}.update_material_qty`, { job_name: jobName, row_name: rowName, quantity });
+export async function updateMaterialQty(jobName: string, rowName: string, quantity: number, changeReason?: string): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.update_material_qty`, {
+    job_name: jobName,
+    row_name: rowName,
+    quantity,
+    ...(changeReason ? { change_reason: changeReason } : {}),
+  });
 }
 
-export async function updateMaterialRate(jobName: string, rowName: string, rate: number): Promise<{ status: string; total_material_cost: number }> {
-  return callMethod(`${MATERIALS_API}.update_material_rate`, { job_name: jobName, row_name: rowName, rate });
+export async function updateMaterialRate(jobName: string, rowName: string, rate: number, changeReason?: string): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.update_material_rate`, {
+    job_name: jobName,
+    row_name: rowName,
+    rate,
+    ...(changeReason ? { change_reason: changeReason } : {}),
+  });
 }
 
 export async function getJobChecklist(jobName: string): Promise<{
