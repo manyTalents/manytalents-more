@@ -971,6 +971,21 @@ export async function addMaterial(jobName: string, item: string, quantity: numbe
   return callMethod(`${MATERIALS_API}.add_material`, { job_name: jobName, item, quantity, source, warehouse });
 }
 
+/** Add a custom (non-pricebook) part to a job by name + price. Backend: add_custom_material. */
+export async function addCustomMaterial(
+  jobName: string,
+  partName: string,
+  price: number,
+  quantity: number = 1
+): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.add_custom_material`, {
+    job_name: jobName,
+    part_name: partName,
+    price,
+    quantity,
+  });
+}
+
 export async function removeMaterial(jobName: string, rowName: string): Promise<{ status: string; total_material_cost: number }> {
   return callMethod(`${MATERIALS_API}.remove_material`, { job_name: jobName, row_name: rowName });
 }

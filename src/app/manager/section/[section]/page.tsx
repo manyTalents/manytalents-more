@@ -40,6 +40,9 @@ interface Job {
   scheduled_date: string;
   total_job_cost: number;
   assigned_techs: Array<{ tech_name: string; tech_user: string }>;
+  // Optional — added by Forge; show when present, hide when absent
+  entered_by_name?: string;
+  owner?: string;
 }
 
 export default function SectionPage() {
@@ -143,6 +146,11 @@ export default function SectionPage() {
                         </span>
                       ))}
                     </div>
+                  )}
+                  {(job.entered_by_name || job.owner) && (
+                    <p className="text-xs text-neutral-600 mt-2">
+                      Entered by: {job.entered_by_name || job.owner}
+                    </p>
                   )}
                 </div>
                 <div className="text-right flex-shrink-0">

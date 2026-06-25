@@ -20,6 +20,7 @@ import {
   saveJobField,
   searchPricebook,
   addMaterial,
+  addCustomMaterial,
   removeMaterial,
   updateMaterialQty,
   updateMaterialRate,
@@ -75,6 +76,7 @@ interface WorkflowAction {
   confirm?: string;
   secondary?: boolean;
   sendBack?: string; // target status — triggers note popup instead of direct action
+  redirectTo?: string; // route to push after a successful action
 }
 
 const WORKFLOW_ACTIONS: Record<string, WorkflowAction[]> = {
@@ -83,6 +85,7 @@ const WORKFLOW_ACTIONS: Record<string, WorkflowAction[]> = {
       label: "Send to Check",
       action: sendToCheck,
       color: "from-purple-600 to-purple-700",
+      redirectTo: "/manager/section/needs_checked",
     },
   ],
   "Needs Check": [
@@ -200,6 +203,13 @@ export default function JobDetailPage() {
   const [savingMaterials, setSavingMaterials] = useState(false);
   const [addingMaterial, setAddingMaterial] = useState(false);
   const [pendingAddQty, setPendingAddQty] = useState("1");
+
+  // Custom-part fallback form
+  const [showCustomPartForm, setShowCustomPartForm] = useState(false);
+  const [customPartName, setCustomPartName] = useState("");
+  const [customPartPrice, setCustomPartPrice] = useState("");
+  const [customPartQty, setCustomPartQty] = useState("1");
+  const [addingCustomPart, setAddingCustomPart] = useState(false);
 
   // Checklist (read-only audit view)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
@@ -345,7 +355,8 @@ export default function JobDetailPage() {
 
   const handleAction = async (
     action: (name: string) => Promise<unknown>,
-    confirmMsg?: string
+    confirmMsg?: string,
+    redirectTo?: string
   ) => {
     if (confirmMsg && !confirm(confirmMsg)) return;
     setActing(true);
@@ -367,7 +378,11 @@ export default function JobDetailPage() {
       } else {
         setActionResult(`Status updated to ${(res?.status as string) || "success"}`);
       }
-      loadJob();
+      if (redirectTo) {
+        router.push(redirectTo);
+      } else {
+        loadJob();
+      }
     } catch (err: unknown) {
       setError(getErrorMessage(err) || "Action failed");
     } finally {
@@ -609,6 +624,11 @@ export default function JobDetailPage() {
             </h2>
             <p className="text-xs text-neutral-500">
               #{job.hcp_job_id} · {job.name}
+              {(job.entered_by_name || job.owner) && (
+                <span className="ml-2 text-neutral-600">
+                  · Entered by: {(job.entered_by_name as string) || (job.owner as string)}
+                </span>
+              )}
             </p>
           </div>
           <a
@@ -675,8 +695,9 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Workflow actions — hidden for Invoiced (PaymentPanel handles it) */}
-        {actions.length > 0 && job.status !== "Invoiced" && (
+        {/* Workflow actions — hidden for Invoiced when PaymentPanel is present.
+            If Invoiced but no sales_invoice (edge case), fall through to show buttons. */}
+        {actions.length > 0 && !(job.status === "Invoiced" && job.sales_invoice) && (
           <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
             <p className="text-xs uppercase tracking-wider text-neutral-400 mb-4">
               Workflow Actions
@@ -685,7 +706,7 @@ export default function JobDetailPage() {
               {actions.filter(a => !a.secondary).map((a, i) => (
                 <button
                   key={i}
-                  onClick={() => handleAction(a.action, a.confirm)}
+                  onClick={() => handleAction(a.action, a.confirm, a.redirectTo)}
                   disabled={acting}
                   className={`bg-gradient-to-br ${a.color} text-white font-bold px-6 py-3 rounded-lg hover:opacity-90 transition disabled:opacity-60`}
                 >
@@ -1197,9 +1218,13 @@ export default function JobDetailPage() {
             {!editingServices ? (
               <button
                 onClick={startEditingServices}
-                className="text-xs text-gold hover:text-gold-light transition"
+                aria-label="Edit Services / Labor"
+                className="flex items-center gap-1.5 text-sm font-medium text-gold hover:text-gold-light border border-gold/30 hover:border-gold/60 px-3 py-1.5 rounded-lg transition"
               >
-                Edit
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4" aria-hidden="true">
+                  <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                </svg>
+                Edit Labor
               </button>
             ) : (
               <div className="flex gap-2">
@@ -1793,6 +1818,92 @@ export default function JobDetailPage() {
                     className="w-16 bg-navy border border-navy-border rounded px-2 py-1 text-sm text-cream focus:outline-none focus:border-gold-dark"
                   />
                 </div>
+
+                {/* Custom-part fallback — visible when search returned no results and query is long enough */}
+                {materialSearch.length >= 2 && !materialSearching && materialSearchResults.length === 0 && (
+                  <div className="mt-3 pt-3 border-t border-navy-border/60">
+                    {!showCustomPartForm ? (
+                      <button
+                        onClick={() => { setShowCustomPartForm(true); setCustomPartName(materialSearch); }}
+                        className="text-sm text-gold hover:text-gold-light transition font-medium"
+                      >
+                        + Part not found? Add custom part
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs text-neutral-400 font-medium">Add custom part</p>
+                        <input
+                          type="text"
+                          value={customPartName}
+                          onChange={(e) => setCustomPartName(e.target.value)}
+                          placeholder="Part name"
+                          className="w-full bg-navy border border-navy-border rounded px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark"
+                        />
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={customPartPrice}
+                              onChange={(e) => setCustomPartPrice(e.target.value)}
+                              placeholder="Price ($)"
+                              className="w-full bg-navy border border-navy-border rounded px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark"
+                            />
+                          </div>
+                          <div className="w-20">
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={customPartQty}
+                              onChange={(e) => setCustomPartQty(e.target.value)}
+                              placeholder="Qty"
+                              className="w-full bg-navy border border-navy-border rounded px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!customPartName.trim() || !customPartPrice) return;
+                              setAddingCustomPart(true);
+                              try {
+                                await addCustomMaterial(
+                                  jobName,
+                                  customPartName.trim(),
+                                  parseFloat(customPartPrice),
+                                  parseInt(customPartQty) || 1
+                                );
+                                setShowCustomPartForm(false);
+                                setCustomPartName("");
+                                setCustomPartPrice("");
+                                setCustomPartQty("1");
+                                setMaterialSearch("");
+                                setMaterialSearchResults([]);
+                                loadJob();
+                              } catch (err: unknown) {
+                                setError(getErrorMessage(err) || "Could not add custom part");
+                              } finally {
+                                setAddingCustomPart(false);
+                              }
+                            }}
+                            disabled={addingCustomPart || !customPartName.trim() || !customPartPrice}
+                            className="flex-1 bg-gold-dark text-navy font-bold text-sm py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50"
+                          >
+                            {addingCustomPart ? "Adding..." : "Add Custom Part"}
+                          </button>
+                          <button
+                            onClick={() => { setShowCustomPartForm(false); setCustomPartName(""); setCustomPartPrice(""); setCustomPartQty("1"); }}
+                            className="text-sm text-neutral-500 hover:text-cream border border-navy-border px-3 py-2 rounded-lg transition"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ) : (job.materials || []).length > 0 ? (
