@@ -3,7 +3,7 @@
  * Uses fetch + token auth. Credentials stored in browser localStorage.
  */
 
-const SITE = process.env.NEXT_PUBLIC_FRAPPE_SITE || "https://manytalentsmore.v.frappe.cloud";
+const SITE = process.env.NEXT_PUBLIC_FRAPPE_SITE || "https://erp.manytalentsmore.com";
 
 export interface AuthCreds {
   siteUrl: string;
@@ -147,110 +147,13 @@ export async function revertStatus(jobName: string, targetStatus: string) {
   return await callMethod(`${API}.revert_status`, { job_name: jobName, target_status: targetStatus });
 }
 
-export async function addJobNote(
-  jobName: string,
-  noteText: string,
-  changeReason?: string
-) {
-  return await callMethod(`${API}.add_job_note`, {
-    job_name: jobName,
-    note_text: noteText,
-    ...(changeReason ? { change_reason: changeReason } : {}),
-  });
+/** Set a job's status directly (forward moves like Finish/Unschedule). Backend validates + role-gates office-only statuses. */
+export async function updateJobStatus(jobName: string, status: string) {
+  return await callMethod(`${API}.update_job_status`, { job_name: jobName, status });
 }
 
-export async function editJobNote(
-  jobName: string,
-  noteIdx: number,
-  noteText: string,
-  changeReason?: string
-) {
-  return await callMethod(`${API}.edit_job_note`, {
-    job_name: jobName,
-    note_idx: noteIdx,
-    note_text: noteText,
-    ...(changeReason ? { change_reason: changeReason } : {}),
-  });
-}
-
-export async function saveJobField(
-  jobName: string,
-  fieldName: string,
-  value: unknown,
-  changeReason?: string
-) {
-  return await callMethod(`${API}.save_job_field`, {
-    job_name: jobName,
-    field_name: fieldName,
-    value,
-    ...(changeReason ? { change_reason: changeReason } : {}),
-  });
-}
-
-export async function updateLaborHours(
-  jobName: string,
-  hours: number,
-  changeReason?: string
-) {
-  return await callMethod(`${API}.update_labor_hours`, {
-    job_name: jobName,
-    hours,
-    ...(changeReason ? { change_reason: changeReason } : {}),
-  });
-}
-
-export async function updateLaborRate(
-  jobName: string,
-  rate: number,
-  changeReason?: string
-) {
-  return await callMethod(`${API}.update_labor_rate`, {
-    job_name: jobName,
-    rate,
-    ...(changeReason ? { change_reason: changeReason } : {}),
-  });
-}
-
-export async function updateChecklistItem(
-  jobName: string,
-  itemIdx: number,
-  checked: boolean,
-  changeReason?: string
-) {
-  return await callMethod(`${API}.update_checklist_item`, {
-    job_name: jobName,
-    item_idx: itemIdx,
-    checked: checked ? 1 : 0,
-    ...(changeReason ? { change_reason: changeReason } : {}),
-  });
-}
-
-export async function updateMaterialQty(
-  jobName: string,
-  materialIdx: number,
-  qty: number,
-  changeReason?: string
-) {
-  return await callMethod(`${API}.update_material_qty`, {
-    job_name: jobName,
-    material_idx: materialIdx,
-    qty,
-    ...(changeReason ? { change_reason: changeReason } : {}),
-  });
-}
-
-export async function updateMaterialRate(
-  jobName: string,
-  materialIdx: number,
-  rate: number,
-  changeReason?: string
-) {
-  return await callMethod(`${API}.update_material_rate`, {
-    job_name: jobName,
-    material_idx: materialIdx,
-    rate,
-    ...(changeReason ? { change_reason: changeReason } : {}),
-  });
+export async function addJobNote(jobName: string, noteText: string) {
+  return await callMethod(`${API}.add_job_note`, { job_name: jobName, note_text: noteText });
 }
 
 /** Revert status AND add a note explaining why */
@@ -286,34 +189,39 @@ export async function createJob(params: {
   labor_hours?: number;
   labor_rate?: number;
   labor_description?: string;
-}): Promise<any> {
+}): Promise<unknown> {
   return await callMethod(`${API}.create_job`, {
     ...params,
     is_estimate: params.is_estimate ? 1 : 0,
     is_vacant: params.is_vacant ? 1 : 0,
-  } as any);
+  } as Record<string, unknown>);
 }
 
 export async function updateJobServices(
   jobName: string,
-  services: Array<{ description: string; qty: number; rate: number }>,
-  changeReason?: string
-): Promise<any> {
+  services: Array<{ description: string; qty: number; rate: number }>
+): Promise<unknown> {
   return await callMethod(`${API}.update_job_services`, {
     job_name: jobName,
     services: JSON.stringify(services),
-    ...(changeReason ? { change_reason: changeReason } : {}),
   });
 }
 
+export async function saveJobField(jobName: string, field: string, value: string): Promise<unknown> {
+  return callMethod(`${API}.save_job_field`, { job_name: jobName, field, value });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe search returns untyped records
 export async function searchCustomers(query: string): Promise<any[]> {
   return await callMethod(`${API}.search_customers`, { query });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe history returns untyped records
 export async function getCustomerHistory(customerName: string): Promise<any> {
   return await callMethod(`${API}.get_customer_history`, { customer_name: customerName });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe search returns untyped records
 export async function searchAddresses(query: string): Promise<any[]> {
   return await callMethod(`${API}.search_addresses`, { query });
 }
@@ -325,18 +233,19 @@ export async function searchAddresses(query: string): Promise<any[]> {
 const AUTH_API = "hcp_replacement.hcp_replacement.api.auth_utils";
 
 /** Extract a human-readable error from a Frappe error response */
-function parseFrappeError(json: any, fallback: string): string {
+function parseFrappeError(json: unknown, fallback: string): string {
+  const j = json as Record<string, unknown>;
   try {
-    if (json?._server_messages) {
-      const msgs = JSON.parse(json._server_messages);
+    if (j?._server_messages) {
+      const msgs = JSON.parse(j._server_messages as string);
       if (msgs?.[0]) {
         const first = typeof msgs[0] === "string" ? JSON.parse(msgs[0]) : msgs[0];
         if (first?.message) return String(first.message).replace(/<[^>]*>/g, "");
       }
     }
   } catch {}
-  if (json?.exception) return String(json.exception);
-  if (json?.message && typeof json.message === "string") return json.message;
+  if (j?.exception) return String(j.exception);
+  if (j?.message && typeof j.message === "string") return j.message;
   return fallback;
 }
 
@@ -354,7 +263,7 @@ async function callGuestMethod<T = unknown>(
     body: data ? JSON.stringify(data) : undefined,
   });
   const text = await res.text();
-  let json: any = null;
+  let json: unknown = null;
   try {
     json = JSON.parse(text);
   } catch {
@@ -363,7 +272,7 @@ async function callGuestMethod<T = unknown>(
   if (!res.ok) {
     throw new Error(parseFrappeError(json, `API ${method} failed (${res.status})`));
   }
-  return json.message as T;
+  return (json as Record<string, unknown>).message as T;
 }
 
 export interface RedeemInviteResponse {
@@ -372,6 +281,15 @@ export interface RedeemInviteResponse {
   site_url: string;
   user_email: string;
   full_name?: string;
+}
+
+/** Email + password login → returns API credentials */
+export async function requestPasswordReset(email: string): Promise<{ sent: boolean; message: string }> {
+  return await callGuestMethod<{ sent: boolean; message: string }>(`${AUTH_API}.request_password_reset`, { email });
+}
+
+export async function loginWithPassword(email: string, password: string): Promise<RedeemInviteResponse> {
+  return await callGuestMethod<RedeemInviteResponse>(`${AUTH_API}.login_with_password`, { email, password });
 }
 
 /** Redeem a magic-link token → returns fresh API credentials */
@@ -494,6 +412,17 @@ export async function assignTech(
   });
 }
 
+/** Unassign a tech (by user email) from a job. */
+export async function unassignTech(
+  jobName: string,
+  techUser: string
+): Promise<{ status: string }> {
+  return await callMethod(`${API}.unassign_tech`, {
+    job_name: jobName,
+    tech_user: techUser,
+  });
+}
+
 // ──────────────────────────────────────────────
 // Access Approvers management
 // ──────────────────────────────────────────────
@@ -565,13 +494,13 @@ export interface ApproveRequestResponse {
   email_sent: boolean;
 }
 
-/** Approve an access request (guest via token, or session via request_id) */
+/** Approve an access request. Requires an authenticated office-role session (F-3). */
 export async function approveAccessRequest(params: {
   token?: string;
   requestId?: string;
   role?: string;
 }): Promise<ApproveRequestResponse> {
-  return await callGuestMethod<ApproveRequestResponse>(`${AUTH_API}.approve_access_request`, {
+  return await callMethod<ApproveRequestResponse>(`${AUTH_API}.approve_access_request`, {
     token: params.token || "",
     request_id: params.requestId || "",
     role: params.role || "",
@@ -583,13 +512,13 @@ export interface DenyRequestResponse {
   requester_email: string;
 }
 
-/** Deny an access request (guest via token, or session via request_id) */
+/** Deny an access request. Requires an authenticated office-role session (F-3). */
 export async function denyAccessRequest(params: {
   token?: string;
   requestId?: string;
   reason?: string;
 }): Promise<DenyRequestResponse> {
-  return await callGuestMethod<DenyRequestResponse>(`${AUTH_API}.deny_access_request`, {
+  return await callMethod<DenyRequestResponse>(`${AUTH_API}.deny_access_request`, {
     token: params.token || "",
     request_id: params.requestId || "",
     reason: params.reason || "",
@@ -1001,7 +930,7 @@ export async function declinePlan(token: string) {
 }
 
 export async function getPlanByToken(token: string) {
-  return callGuestMethod<any>(`${PLANS_API}.get_plan_by_token`, { token });
+  return callGuestMethod<unknown>(`${PLANS_API}.get_plan_by_token`, { token });
 }
 
 export async function generateWorkOrder(planName: string) {
@@ -1023,4 +952,471 @@ export async function getPlansDue(daysAhead = 14) {
     }[];
     count: number;
   }>(`${PLANS_API}.get_plans_due`, { days_ahead: daysAhead });
+}
+
+// ── Materials & Checklist ──────────────────────────────────────
+const MATERIALS_API = "hcp_replacement.hcp_replacement.api.materials";
+
+export async function searchPricebook(query: string, limit = 20): Promise<Array<{
+  name: string;
+  item_name: string;
+  description?: string;
+  stock_uom?: string;
+  standard_rate: number;
+}>> {
+  return callMethod(`${MATERIALS_API}.search_pricebook`, { query, limit });
+}
+
+export async function addMaterial(jobName: string, item: string, quantity: number, source: string, warehouse: string): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.add_material`, { job_name: jobName, item, quantity, source, warehouse });
+}
+
+/** Add a custom (non-pricebook) part to a job by name + price. Backend: add_custom_material. */
+export async function addCustomMaterial(
+  jobName: string,
+  partName: string,
+  price: number,
+  quantity: number = 1
+): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.add_custom_material`, {
+    job_name: jobName,
+    part_name: partName,
+    price,
+    quantity,
+  });
+}
+
+export async function removeMaterial(jobName: string, rowName: string): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.remove_material`, { job_name: jobName, row_name: rowName });
+}
+
+export async function updateMaterialQty(jobName: string, rowName: string, quantity: number): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.update_material_qty`, { job_name: jobName, row_name: rowName, quantity });
+}
+
+export async function updateMaterialRate(jobName: string, rowName: string, rate: number): Promise<{ status: string; total_material_cost: number }> {
+  return callMethod(`${MATERIALS_API}.update_material_rate`, { job_name: jobName, row_name: rowName, rate });
+}
+
+export async function getJobChecklist(jobName: string): Promise<{
+  job_name: string;
+  populated_from_template: boolean;
+  items: Array<{ idx: number; item_text: string; required: number; checked: number; checked_at: string | null; checked_by: string | null }>;
+}> {
+  return callMethod("hcp_replacement.hcp_replacement.api.checklists.get_job_checklist", { job_name: jobName });
+}
+
+// ── Payments ──────────────────────────────────────────────────────────────────
+
+const INVOICE_API = "hcp_replacement.hcp_replacement.api.invoice";
+const STRIPE_API = "hcp_replacement.hcp_replacement.api.stripe_payments";
+const RECEIPT_API = "hcp_replacement.hcp_replacement.api.receipt_delivery";
+
+export interface RecordPaymentResult {
+  success: boolean;
+  invoice_name: string;
+  method: string;
+  paid_at: string;
+}
+
+/** Record a cash or check payment against a Sales Invoice. */
+export async function recordPayment(
+  invoiceName: string,
+  method: "cash" | "check",
+  amount: number,
+  reference?: string
+): Promise<RecordPaymentResult> {
+  return callMethod<RecordPaymentResult>(`${INVOICE_API}.record_payment`, {
+    invoice_name: invoiceName,
+    method,
+    amount,
+    reference: reference ?? "",
+  });
+}
+
+export interface StripeConfig {
+  configured: boolean;
+  publishable_key?: string;
+}
+
+/** Fetch the Stripe publishable key from ERPNext site config. */
+export async function getStripeConfig(): Promise<StripeConfig> {
+  return callMethod<StripeConfig>(`${STRIPE_API}.get_stripe_config`);
+}
+
+export interface PaymentIntentResult {
+  client_secret: string;
+  payment_intent_id: string;
+  publishable_key: string;
+}
+
+/** Create a Stripe PaymentIntent for the given invoice + amount (card total, fee included). */
+export async function createPaymentIntent(
+  invoiceName: string,
+  amount: number
+): Promise<PaymentIntentResult> {
+  return callMethod<PaymentIntentResult>(`${STRIPE_API}.create_payment_intent`, {
+    invoice_name: invoiceName,
+    amount,
+  });
+}
+
+export interface ConfirmCardPaymentResult {
+  success: boolean;
+  invoice_name: string;
+  method: string;
+  paid_at: string;
+}
+
+/** Record a confirmed Stripe card payment in ERPNext. */
+export async function confirmCardPayment(
+  invoiceName: string,
+  paymentIntentId: string
+): Promise<ConfirmCardPaymentResult> {
+  return callMethod<ConfirmCardPaymentResult>(`${STRIPE_API}.confirm_card_payment`, {
+    invoice_name: invoiceName,
+    payment_intent_id: paymentIntentId,
+  });
+}
+
+export interface PaymentLinkResult {
+  url: string;
+  session_id: string;
+}
+
+/** Create a Stripe Checkout Session pay-link for a customer to pay remotely. */
+export async function createInvoicePaymentLink(
+  invoiceName: string
+): Promise<PaymentLinkResult> {
+  return callMethod<PaymentLinkResult>(`${STRIPE_API}.create_invoice_payment_link`, {
+    invoice_name: invoiceName,
+  });
+}
+
+export interface ReceiptTokenResult {
+  token_url: string;
+}
+
+/** Generate an opaque receipt token URL (used as a share target). */
+export async function generateReceiptToken(
+  invoiceName: string
+): Promise<ReceiptTokenResult> {
+  return callMethod<ReceiptTokenResult>(`${RECEIPT_API}.generate_receipt_token`, {
+    invoice_name: invoiceName,
+  });
+}
+
+export interface SendReceiptEmailResult {
+  success: boolean;
+  message: string;
+}
+
+/** Email the PDF receipt to a customer. */
+export async function sendReceiptEmail(
+  invoiceName: string,
+  email: string
+): Promise<SendReceiptEmailResult> {
+  return callMethod<SendReceiptEmailResult>(`${RECEIPT_API}.send_receipt_email`, {
+    invoice_name: invoiceName,
+    email,
+  });
+}
+
+export interface SendReceiptSmsResult {
+  success: boolean;
+  message: string;
+}
+
+/** SMS the receipt link to a customer. */
+export async function sendReceiptSms(
+  invoiceName: string,
+  phone: string
+): Promise<SendReceiptSmsResult> {
+  return callMethod<SendReceiptSmsResult>(`${RECEIPT_API}.send_receipt_sms`, {
+    invoice_name: invoiceName,
+    phone,
+  });
+}
+
+export interface InvoiceSettings {
+  card_processing_pct: number;
+  default_labor_rate: number;
+}
+
+// ── Job Photo Upload ───────────────────────────────────────────────────────────
+
+const PHOTO_API = "hcp_replacement.hcp_replacement.api.photo_upload";
+
+export interface PhotoUploadResult {
+  photo_row_name: string;
+  classification: string;
+  confidence: number;
+  quality_ok: boolean;
+  quality_warnings: string[];
+  receipt_name?: string;
+}
+
+/**
+ * Step 1 — upload a raw file to Frappe's file storage. Returns the server-side
+ * file_url which is then passed to uploadAndClassifyPhoto.
+ * Mirrors mobile queue.ts uploadFile().
+ */
+export async function uploadRawFile(file: File): Promise<string> {
+  const creds = getAuth();
+  if (!creds) throw new Error("Not authenticated");
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  formData.append("is_private", "0");
+  const res = await fetch(`${baseUrl()}/api/method/upload_file`, {
+    method: "POST",
+    headers: {
+      Authorization: `token ${creds.apiKey}:${creds.apiSecret}`,
+      // NOTE: do NOT set Content-Type — browser sets it with the correct boundary
+    },
+    body: formData,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`upload_file failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const json = await res.json() as { message?: { file_url?: string } };
+  const fileUrl = json.message?.file_url;
+  if (!fileUrl) throw new Error("upload_file returned no file_url");
+  return fileUrl;
+}
+
+/**
+ * Step 2 — classify/attach the uploaded file to a job.
+ * Mirrors mobile queue.ts uploadAndClassify().
+ * Endpoint: hcp_replacement.hcp_replacement.api.photo_upload.upload_and_classify
+ */
+export async function uploadAndClassifyPhoto(
+  hcpJobName: string,
+  fileUrl: string
+): Promise<PhotoUploadResult> {
+  return callMethod<PhotoUploadResult>(`${PHOTO_API}.upload_and_classify`, {
+    hcp_job_name: hcpJobName,
+    file_url: fileUrl,
+  });
+}
+
+// ── HCP Sync ──────────────────────────────────────────────────────────────────
+
+const HCP_SYNC_API = "hcp_replacement.hcp_replacement.core.hcp_sync";
+
+export interface SyncHcpJobResult {
+  status: string;
+  synced_at: string;
+}
+
+/**
+ * Push + pull sync between MTM and HouseCall Pro.
+ * Mirrors mobile JobDetailScreen.tsx handleSync().
+ * Endpoint: hcp_replacement.hcp_replacement.core.hcp_sync.sync_hcp_job
+ */
+export async function syncHcpJob(hcpJobName: string): Promise<SyncHcpJobResult> {
+  return callMethod<SyncHcpJobResult>(`${HCP_SYNC_API}.sync_hcp_job`, {
+    hcp_job_name: hcpJobName,
+  });
+}
+
+// ── Time Tracking (clock in/out) ──────────────────────────────────────────────
+
+const TIME_API = "hcp_replacement.hcp_replacement.api.time_tracking";
+
+export interface ClockStatusResult {
+  clocked_in: boolean;
+  clock_in_time?: string;
+  timesheet?: string;
+}
+
+export interface DayClockInResult {
+  status: string;
+  clock_in_time: string;
+  timesheet: string;
+}
+
+export interface DayClockOutResult {
+  status: string;
+  hours: number;
+}
+
+export interface JobClockInResult {
+  status: string;
+}
+
+export interface JobClockOutResult {
+  status: string;
+  hours: number;
+}
+
+/**
+ * Get the current user's day-level clock status.
+ * Endpoint: hcp_replacement.hcp_replacement.api.time_tracking.get_clock_status
+ */
+export async function getClockStatus(): Promise<ClockStatusResult> {
+  return callMethod<ClockStatusResult>(`${TIME_API}.get_clock_status`);
+}
+
+/**
+ * Clock the current user in for the day (creates a Timesheet).
+ * Endpoint: hcp_replacement.hcp_replacement.api.time_tracking.day_clock_in
+ */
+export async function dayClockIn(): Promise<DayClockInResult> {
+  return callMethod<DayClockInResult>(`${TIME_API}.day_clock_in`);
+}
+
+/**
+ * Clock the current user out for the day (closes the Timesheet).
+ * Endpoint: hcp_replacement.hcp_replacement.api.time_tracking.day_clock_out
+ */
+export async function dayClockOut(): Promise<DayClockOutResult> {
+  return callMethod<DayClockOutResult>(`${TIME_API}.day_clock_out`);
+}
+
+/**
+ * Clock in to a specific job.
+ * Endpoint: hcp_replacement.hcp_replacement.api.time_tracking.clock_in
+ */
+export async function jobClockIn(hcpJobName: string): Promise<JobClockInResult> {
+  return callMethod<JobClockInResult>(`${TIME_API}.clock_in`, {
+    hcp_job_name: hcpJobName,
+  });
+}
+
+/**
+ * Clock out of a specific job.
+ * Endpoint: hcp_replacement.hcp_replacement.api.time_tracking.clock_out
+ */
+export async function jobClockOut(hcpJobName: string): Promise<JobClockOutResult> {
+  return callMethod<JobClockOutResult>(`${TIME_API}.clock_out`, {
+    hcp_job_name: hcpJobName,
+  });
+}
+
+// ── Receipt Dispatch ──────────────────────────────────────────────────────────
+
+const LIMBO_API = "hcp_replacement.hcp_replacement.api.limbo";
+const RECEIPT_OCR_API = "hcp_replacement.hcp_replacement.api.receipt_ocr";
+
+/** Destinations available when dispatching a receipt line item. */
+export type ReceiptDispatchDestination =
+  | "This Job"
+  | "Different Job"
+  | "Truck Stock"
+  | "Warehouse"
+  | "Return"
+  | "Discard";
+
+/** One parsed item row returned by get_receipt_dispatch_state. */
+export interface ReceiptDispatchLine {
+  /** `name` of the parsed-items child row — used as parsed_item_row. */
+  parsed_item_row: string;
+  description: string;
+  quantity: number;
+  product_code: string | null;
+  unit_price: number | null;
+  total_price: number | null;
+  dispatched: boolean;
+  dispatch_destination: ReceiptDispatchDestination | null;
+  destination_job: string | null;
+}
+
+export interface ReceiptDispatchState {
+  receipt_name: string;
+  supplier: string | null;
+  receipt_date: string | null;
+  parsed_total: number;
+  lines: ReceiptDispatchLine[];
+  pending_count: number;
+  dispatched_count: number;
+}
+
+/** One item in the items_json payload sent to dispatch_receipt_items. */
+export interface ReceiptDispatchPayloadItem {
+  parsed_item_row: string;
+  destination: ReceiptDispatchDestination;
+  dispatch_quantity: number;
+  destination_job?: string;
+}
+
+export interface DispatchReceiptItemsResult {
+  dispatched: number;
+  counts: Partial<Record<ReceiptDispatchDestination, number>>;
+}
+
+/**
+ * Fetch current dispatch state for every parsed line on a receipt.
+ * Endpoint: hcp_replacement.hcp_replacement.api.limbo.get_receipt_dispatch_state
+ */
+export async function getReceiptDispatchState(
+  receiptName: string
+): Promise<ReceiptDispatchState> {
+  return callMethod<ReceiptDispatchState>(`${LIMBO_API}.get_receipt_dispatch_state`, {
+    receipt_name: receiptName,
+  });
+}
+
+/**
+ * Dispatch one or more receipt lines to their chosen destinations.
+ * Endpoint: hcp_replacement.hcp_replacement.api.limbo.dispatch_receipt_items
+ */
+export async function dispatchReceiptItems(
+  receiptName: string,
+  items: ReceiptDispatchPayloadItem[]
+): Promise<DispatchReceiptItemsResult> {
+  return callMethod<DispatchReceiptItemsResult>(`${LIMBO_API}.dispatch_receipt_items`, {
+    receipt_name: receiptName,
+    items_json: JSON.stringify(items),
+  });
+}
+
+/** Summary row returned by get_linked_receipts. */
+export interface LinkedReceiptSummary {
+  name: string;
+  receipt_date: string | null;
+  supplier: string | null;
+  ocr_status: string;
+  parsed_total: number;
+}
+
+/**
+ * Fetch receipts linked to a job.
+ * Endpoint: hcp_replacement.hcp_replacement.api.receipt_ocr.get_linked_receipts
+ */
+export async function getLinkedReceipts(
+  hcpJobName: string
+): Promise<LinkedReceiptSummary[]> {
+  return callMethod<LinkedReceiptSummary[]>(`${RECEIPT_OCR_API}.get_linked_receipts`, {
+    hcp_job_name: hcpJobName,
+  });
+}
+
+/** Fetch MTM Invoice Settings (single doctype) — needed for card fee %. */
+export async function getInvoiceSettings(): Promise<InvoiceSettings> {
+  // MTM Invoice Settings is a Single doctype — read via the document API
+  const res = await fetch(
+    `${(getAuth()?.siteUrl || "https://erp.manytalentsmore.com").replace(/\/+$/, "")}/api/resource/MTM Invoice Settings/MTM Invoice Settings`,
+    {
+      headers: {
+        ...(() => {
+          const creds = getAuth();
+          if (!creds) throw new Error("Not authenticated");
+          return {
+            Authorization: `token ${creds.apiKey}:${creds.apiSecret}`,
+            Accept: "application/json",
+          };
+        })(),
+      },
+    }
+  );
+  if (!res.ok) {
+    // Graceful fallback — same defaults as the Python get_settings()
+    return { card_processing_pct: 2.7, default_labor_rate: 155 };
+  }
+  const json = await res.json() as { data?: { card_processing_pct?: number; default_labor_rate?: number } };
+  return {
+    card_processing_pct: json.data?.card_processing_pct ?? 2.7,
+    default_labor_rate: json.data?.default_labor_rate ?? 155,
+  };
 }
