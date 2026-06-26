@@ -17,6 +17,7 @@ import {
   getDefaultLaborRate,
   getEstimateList,
   addJobNote,
+  editJobNote,
   saveJobField,
   searchPricebook,
   addMaterial,
@@ -145,6 +146,7 @@ const WORKFLOW_ACTIONS: Record<string, WorkflowAction[]> = {
   ],
   Assigned: [
     { label: "Finish Job", action: (n) => updateJobStatus(n, "Completed"), color: "from-purple-600 to-purple-700", confirm: "Mark this job finished (Completed) and send it for office review?" },
+    { label: "Schedule", action: (n) => updateJobStatus(n, "Scheduled"), color: "from-blue-600 to-blue-700", secondary: true },
   ],
   Scheduled: [
     { label: "Finish Job", action: (n) => updateJobStatus(n, "Completed"), color: "from-purple-600 to-purple-700", confirm: "Mark this job finished (Completed) and send it for office review?" },
@@ -222,6 +224,10 @@ export default function JobDetailPage() {
   // Notes
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
+  // Note editing
+  const [editingNoteName, setEditingNoteName] = useState<string | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState("");
+  const [savingEditNote, setSavingEditNote] = useState(false);
 
   // Photo upload
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -513,6 +519,25 @@ export default function JobDetailPage() {
         throw err;
       } finally {
         setSavingNote(false);
+      }
+    });
+  };
+
+  const handleEditNote = (noteName: string) => {
+    if (!editingNoteText.trim()) return;
+    guardedAction(async (changeReason) => {
+      setSavingEditNote(true);
+      setError("");
+      try {
+        await editJobNote(jobName, noteName, editingNoteText.trim(), changeReason);
+        setEditingNoteName(null);
+        setEditingNoteText("");
+        loadJob();
+      } catch (err: unknown) {
+        setError(getErrorMessage(err) || "Could not save note edit");
+        throw err;
+      } finally {
+        setSavingEditNote(false);
       }
     });
   };
@@ -1187,28 +1212,75 @@ export default function JobDetailPage() {
             return (
               <ul className="space-y-3">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
-                {sorted.map((note: any, i: number) => (
-                  <li
-                    key={i}
-                    className="bg-navy border border-navy-border rounded-xl px-4 py-3"
-                  >
-                    <p className="text-sm text-neutral-200 leading-relaxed whitespace-pre-wrap">
-                      {note.note_text}
-                    </p>
-                    <p className="text-xs text-neutral-500 mt-2">
-                      {note.note_by || "Unknown"}
-                      {note.note_at
-                        ? ` · ${new Date(note.note_at).toLocaleString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}`
-                        : ""}
-                    </p>
-                  </li>
-                ))}
+                {sorted.map((note: any, i: number) => {
+                  const isEditingThis = editingNoteName === note.name;
+                  return (
+                    <li
+                      key={note.name || i}
+                      className="bg-navy border border-navy-border rounded-xl px-4 py-3"
+                    >
+                      {isEditingThis ? (
+                        <div className="flex flex-col gap-2">
+                          <textarea
+                            value={editingNoteText}
+                            onChange={(e) => setEditingNoteText(e.target.value)}
+                            rows={3}
+                            autoFocus
+                            className="w-full bg-navy-surface border border-navy-border rounded-lg px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark transition resize-none"
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => { setEditingNoteName(null); setEditingNoteText(""); }}
+                              className="text-xs text-neutral-500 hover:text-cream transition"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleEditNote(note.name)}
+                              disabled={savingEditNote || !editingNoteText.trim()}
+                              className="bg-gold-dark text-navy font-bold text-xs px-3 py-1.5 rounded-lg hover:opacity-90 transition disabled:opacity-40"
+                            >
+                              {savingEditNote ? "Saving..." : "Save"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm text-neutral-200 leading-relaxed whitespace-pre-wrap flex-1">
+                              {note.note_text}
+                              {note.edited_at && (
+                                <span className="text-neutral-500 text-xs ml-1.5">(edited)</span>
+                              )}
+                            </p>
+                            <button
+                              onClick={() => { setEditingNoteName(note.name); setEditingNoteText(note.note_text); }}
+                              aria-label="Edit note"
+                              title="Edit note"
+                              className="text-neutral-500 hover:text-gold transition flex-shrink-0 mt-0.5"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5" aria-hidden="true">
+                                <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                              </svg>
+                            </button>
+                          </div>
+                          <p className="text-xs text-neutral-500 mt-2">
+                            {note.note_by || "Unknown"}
+                            {note.note_at
+                              ? ` · ${new Date(note.note_at).toLocaleString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                })}`
+                              : ""}
+                          </p>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             );
           })()}

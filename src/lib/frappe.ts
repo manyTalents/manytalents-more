@@ -160,6 +160,15 @@ export async function addJobNote(jobName: string, noteText: string, changeReason
   });
 }
 
+export async function editJobNote(jobName: string, noteName: string, noteText: string, changeReason?: string) {
+  return await callMethod(`${API}.edit_job_note`, {
+    job_name: jobName,
+    note_name: noteName,
+    note_text: noteText,
+    ...(changeReason ? { change_reason: changeReason } : {}),
+  });
+}
+
 /** Revert status AND add a note explaining why */
 export async function revertWithNote(jobName: string, targetStatus: string, note: string) {
   if (note.trim()) {
