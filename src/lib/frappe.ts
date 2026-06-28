@@ -160,6 +160,15 @@ export async function addJobNote(jobName: string, noteText: string, changeReason
   });
 }
 
+export async function editJobNote(jobName: string, noteName: string, noteText: string, changeReason?: string) {
+  return await callMethod(`${API}.edit_job_note`, {
+    job_name: jobName,
+    note_name: noteName,
+    note_text: noteText,
+    ...(changeReason ? { change_reason: changeReason } : {}),
+  });
+}
+
 /** Revert status AND add a note explaining why */
 export async function revertWithNote(jobName: string, targetStatus: string, note: string) {
   if (note.trim()) {
@@ -1038,6 +1047,21 @@ export async function getJobChecklist(jobName: string): Promise<{
   items: Array<{ idx: number; item_text: string; required: number; checked: number; checked_at: string | null; checked_by: string | null }>;
 }> {
   return callMethod("hcp_replacement.hcp_replacement.api.checklists.get_job_checklist", { job_name: jobName });
+}
+
+/** Toggle a single checklist item on or off. Mirrors the mobile FinishJobChecklist behaviour. */
+export async function updateChecklistItem(
+  jobName: string,
+  itemIdx: number,
+  checked: boolean,
+  changeReason?: string
+): Promise<void> {
+  await callMethod("hcp_replacement.hcp_replacement.api.checklists.update_checklist_item", {
+    job_name: jobName,
+    item_idx: itemIdx,
+    checked: checked ? 1 : 0,
+    ...(changeReason ? { change_reason: changeReason } : {}),
+  });
 }
 
 // ── Payments ──────────────────────────────────────────────────────────────────

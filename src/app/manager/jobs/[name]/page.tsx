@@ -17,6 +17,7 @@ import {
   getDefaultLaborRate,
   getEstimateList,
   addJobNote,
+  editJobNote,
   saveJobField,
   searchPricebook,
   addMaterial,
@@ -25,6 +26,7 @@ import {
   updateMaterialQty,
   updateMaterialRate,
   getJobChecklist,
+  updateChecklistItem,
   getInvoiceSettings,
   uploadRawFile,
   uploadAndClassifyPhoto,
@@ -145,6 +147,7 @@ const WORKFLOW_ACTIONS: Record<string, WorkflowAction[]> = {
   ],
   Assigned: [
     { label: "Finish Job", action: (n) => updateJobStatus(n, "Completed"), color: "from-purple-600 to-purple-700", confirm: "Mark this job finished (Completed) and send it for office review?" },
+    { label: "Schedule", action: (n) => updateJobStatus(n, "Scheduled"), color: "from-blue-600 to-blue-700", secondary: true },
   ],
   Scheduled: [
     { label: "Finish Job", action: (n) => updateJobStatus(n, "Completed"), color: "from-purple-600 to-purple-700", confirm: "Mark this job finished (Completed) and send it for office review?" },
@@ -212,16 +215,26 @@ export default function JobDetailPage() {
   const [customPartQty, setCustomPartQty] = useState("1");
   const [addingCustomPart, setAddingCustomPart] = useState(false);
 
-  // Checklist (read-only audit view)
+  // Checklist (editable audit view)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
   const [checklist, setChecklist] = useState<any>(null);
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistError, setChecklistError] = useState("");
   const [checklistVisible, setChecklistVisible] = useState(false);
+  const [checklistToggling, setChecklistToggling] = useState<Set<number>>(new Set());
+
+  // Editable labor description (job_description — prints on the invoice)
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionField, setDescriptionField] = useState("");
+  const [savingDescription, setSavingDescription] = useState(false);
 
   // Notes
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
+  // Note editing
+  const [editingNoteName, setEditingNoteName] = useState<string | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState("");
+  const [savingEditNote, setSavingEditNote] = useState(false);
 
   // Photo upload
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -513,6 +526,85 @@ export default function JobDetailPage() {
         throw err;
       } finally {
         setSavingNote(false);
+      }
+    });
+  };
+
+  const handleEditNote = (noteName: string) => {
+    if (!editingNoteText.trim()) return;
+    guardedAction(async (changeReason) => {
+      setSavingEditNote(true);
+      setError("");
+      try {
+        await editJobNote(jobName, noteName, editingNoteText.trim(), changeReason);
+        setEditingNoteName(null);
+        setEditingNoteText("");
+        loadJob();
+      } catch (err: unknown) {
+        setError(getErrorMessage(err) || "Could not save note edit");
+        throw err;
+      } finally {
+        setSavingEditNote(false);
+      }
+    });
+  };
+
+  // ── Labor description save ──────────────────────────────────────
+  const saveDescription = () => {
+    guardedAction(async (changeReason) => {
+      setSavingDescription(true);
+      setError("");
+      try {
+        await saveJobField(jobName, "job_description", descriptionField, changeReason);
+        setEditingDescription(false);
+        setActionResult("Labor description updated");
+        loadJob();
+      } catch (err: unknown) {
+        setError(getErrorMessage(err) || "Could not save description");
+        throw err;
+      } finally {
+        setSavingDescription(false);
+      }
+    });
+  };
+
+  // ── Checklist item toggle ────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
+  const handleChecklistToggle = (item: any) => {
+    const itemIdx: number = item.idx;
+    const nowChecked: boolean = !item.checked;
+    guardedAction(async (changeReason) => {
+      // Mark in-flight
+      setChecklistToggling((prev) => { const s = new Set(prev); s.add(itemIdx); return s; });
+      // Optimistic update
+      setChecklist((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((i: any) =>
+            i.idx === itemIdx ? { ...i, checked: nowChecked ? 1 : 0 } : i
+          ),
+        };
+      });
+      try {
+        await updateChecklistItem(jobName, itemIdx, nowChecked, changeReason);
+        // Background-refresh so checked_by / checked_at populate
+        getJobChecklist(jobName).then((data) => setChecklist(data)).catch(() => {});
+      } catch (err: unknown) {
+        // Revert optimistic update on failure
+        setChecklist((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            items: prev.items.map((i: any) =>
+              i.idx === itemIdx ? { ...i, checked: nowChecked ? 0 : 1 } : i
+            ),
+          };
+        });
+        setChecklistError(getErrorMessage(err) || "Could not update checklist item");
+        throw err;
+      } finally {
+        setChecklistToggling((prev) => { const s = new Set(prev); s.delete(itemIdx); return s; });
       }
     });
   };
@@ -1187,51 +1279,146 @@ export default function JobDetailPage() {
             return (
               <ul className="space-y-3">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape */}
-                {sorted.map((note: any, i: number) => (
-                  <li
-                    key={i}
-                    className="bg-navy border border-navy-border rounded-xl px-4 py-3"
-                  >
-                    <p className="text-sm text-neutral-200 leading-relaxed whitespace-pre-wrap">
-                      {note.note_text}
-                    </p>
-                    <p className="text-xs text-neutral-500 mt-2">
-                      {note.note_by || "Unknown"}
-                      {note.note_at
-                        ? ` · ${new Date(note.note_at).toLocaleString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}`
-                        : ""}
-                    </p>
-                  </li>
-                ))}
+                {sorted.map((note: any, i: number) => {
+                  const isEditingThis = editingNoteName === note.name;
+                  return (
+                    <li
+                      key={note.name || i}
+                      className="bg-navy border border-navy-border rounded-xl px-4 py-3"
+                    >
+                      {isEditingThis ? (
+                        <div className="flex flex-col gap-2">
+                          <textarea
+                            value={editingNoteText}
+                            onChange={(e) => setEditingNoteText(e.target.value)}
+                            rows={3}
+                            autoFocus
+                            className="w-full bg-navy-surface border border-navy-border rounded-lg px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark transition resize-none"
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => { setEditingNoteName(null); setEditingNoteText(""); }}
+                              className="text-xs text-neutral-500 hover:text-cream transition"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleEditNote(note.name)}
+                              disabled={savingEditNote || !editingNoteText.trim()}
+                              className="bg-gold-dark text-navy font-bold text-xs px-3 py-1.5 rounded-lg hover:opacity-90 transition disabled:opacity-40"
+                            >
+                              {savingEditNote ? "Saving..." : "Save"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm text-neutral-200 leading-relaxed whitespace-pre-wrap flex-1">
+                              {note.note_text}
+                              {note.edited_at && (
+                                <span className="text-neutral-500 text-xs ml-1.5">(edited)</span>
+                              )}
+                            </p>
+                            <button
+                              onClick={() => { setEditingNoteName(note.name); setEditingNoteText(note.note_text); }}
+                              aria-label="Edit note"
+                              title="Edit note"
+                              className="text-neutral-500 hover:text-gold transition flex-shrink-0 mt-0.5"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5" aria-hidden="true">
+                                <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                              </svg>
+                            </button>
+                          </div>
+                          <p className="text-xs text-neutral-500 mt-2">
+                            {note.note_by || "Unknown"}
+                            {note.note_at
+                              ? ` · ${new Date(note.note_at).toLocaleString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                })}`
+                              : ""}
+                          </p>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             );
           })()}
         </div>
 
-        {/* Description */}
-        {(job.description || job.job_description) && (
-          <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
-            <p className="text-xs uppercase tracking-wider text-neutral-400 mb-3">
-              Description
+        {/* Labor Description (editable — prints on the invoice) */}
+        <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs uppercase tracking-wider text-neutral-400">
+              Labor Description
             </p>
-            {job.job_description && (
-              <p className="text-sm text-neutral-300 leading-relaxed mb-3">
-                {job.job_description}
-              </p>
-            )}
-            {job.description && job.description !== job.job_description && (
-              <p className="text-sm text-neutral-400 leading-relaxed">
-                {job.description}
-              </p>
+            {!editingDescription ? (
+              <button
+                onClick={() => {
+                  setDescriptionField(job.job_description ?? "");
+                  setEditingDescription(true);
+                }}
+                aria-label="Edit labor description"
+                className="flex items-center gap-1.5 text-sm font-medium text-gold hover:text-gold-light border border-gold/30 hover:border-gold/60 px-3 py-1.5 rounded-lg transition"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4" aria-hidden="true">
+                  <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                </svg>
+                Edit
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setEditingDescription(false); setError(""); }}
+                  className="text-xs text-neutral-500 hover:text-cream transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveDescription}
+                  disabled={savingDescription}
+                  className="text-xs bg-gold-dark text-navy font-bold px-3 py-1 rounded transition disabled:opacity-60"
+                >
+                  {savingDescription ? "Saving..." : "Save"}
+                </button>
+              </div>
             )}
           </div>
-        )}
+          {editingDescription ? (
+            <textarea
+              value={descriptionField}
+              onChange={(e) => setDescriptionField(e.target.value)}
+              rows={4}
+              placeholder="Describe the work performed (appears on the invoice)..."
+              className="w-full bg-navy border border-navy-border rounded px-3 py-2 text-sm text-cream focus:outline-none focus:border-gold-dark transition resize-none"
+            />
+          ) : (
+            <>
+              {job.job_description && (
+                <p className="text-sm text-neutral-300 leading-relaxed mb-3">
+                  {job.job_description}
+                </p>
+              )}
+              {job.description && job.description !== job.job_description && (
+                <p className="text-sm text-neutral-400 leading-relaxed">
+                  {job.description}
+                </p>
+              )}
+              {!job.job_description && !job.description && (
+                <p className="text-sm text-neutral-500 italic">
+                  No description yet. Click Edit to add one.
+                </p>
+              )}
+            </>
+          )}
+        </div>
 
         {/* Services (editable) */}
         <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
@@ -1554,7 +1741,7 @@ export default function JobDetailPage() {
           );
         })()}
 
-        {/* Finish-Job Checklist (office audit) */}
+        {/* Finish-Job Checklist (editable — office can check/uncheck items) */}
         <div className="bg-navy-surface border border-navy-border rounded-2xl p-6">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs uppercase tracking-wider text-neutral-400">
@@ -1611,17 +1798,23 @@ export default function JobDetailPage() {
                           : "border-navy-border"
                       }`}
                     >
-                      <span
-                        className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
-                          item.checked
-                            ? "border-emerald-500 bg-emerald-900/40 text-emerald-400"
+                      <button
+                        onClick={() => handleChecklistToggle(item)}
+                        disabled={checklistToggling.has(item.idx)}
+                        aria-label={item.checked ? "Uncheck item" : "Check item"}
+                        aria-pressed={!!item.checked}
+                        className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs font-bold transition disabled:opacity-50 ${
+                          checklistToggling.has(item.idx)
+                            ? "border-gold/50 bg-gold/10 text-gold"
+                            : item.checked
+                            ? "border-emerald-500 bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60"
                             : item.required
-                            ? "border-amber-700 text-transparent"
-                            : "border-neutral-700 text-transparent"
+                            ? "border-amber-700 text-transparent hover:bg-amber-900/20"
+                            : "border-neutral-700 text-transparent hover:bg-neutral-800"
                         }`}
                       >
-                        {item.checked ? "✓" : ""}
-                      </span>
+                        {checklistToggling.has(item.idx) ? "·" : item.checked ? "✓" : ""}
+                      </button>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm leading-snug ${item.checked ? "text-neutral-300" : "text-cream"}`}>
                           {item.item_text}
