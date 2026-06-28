@@ -2,11 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAuth, callMethod } from "@/lib/frappe";
+import {
+  getAuth,
+  callMethod,
+  getInvoiceSettings,
+  updateInvoiceSettings,
+} from "@/lib/frappe";
 import NavBar from "@/app/manager/components/NavBar";
 import { getErrorMessage } from "@/lib/errors";
 
-interface InvoiceSettings {
+// ── Old doctype fields ──────────────────────────────────────────────────────
+
+interface OldInvoiceSettings {
   default_markup_pct: number;
   default_labor_rate: number;
   card_processing_pct: number;
@@ -30,17 +37,26 @@ const FIELDS = [
   "clause_3_title", "clause_3_text", "google_review_url", "company_license_number",
 ];
 
+// ── Component ───────────────────────────────────────────────────────────────
+
 export default function InvoiceSettingsPage() {
   const router = useRouter();
-  const [settings, setSettings] = useState<InvoiceSettings | null>(null);
+
+  // -- Old doctype state --
+  const [settings, setSettings] = useState<OldInvoiceSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  useEffect(() => {
-    if (!getAuth()) { router.replace("/manager"); return; }
-    loadSettings();
-  }, [router]);
+  // -- New Forge content state --
+  const [clauses, setClauses] = useState<string[]>([]);
+  const [verse, setVerse] = useState("");
+  const [licenseText, setLicenseText] = useState("");
+  const [contentLoading, setContentLoading] = useState(true);
+  const [contentSaving, setContentSaving] = useState(false);
+  const [contentError, setContentError] = useState("");
+  const [contentSuccess, setContentSuccess] = useState("");
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const loadSettings = async () => {
     try {
@@ -48,11 +64,34 @@ export default function InvoiceSettingsPage() {
         doctype: "MTM Invoice Settings",
         name: "MTM Invoice Settings",
       });
-      setSettings(res as InvoiceSettings);
+      setSettings(res as OldInvoiceSettings);
     } catch (e: unknown) {
       setError(getErrorMessage(e) || "Failed to load settings");
     }
   };
+
+  const loadContent = async () => {
+    setContentLoading(true);
+    setContentError("");
+    try {
+      const res = await getInvoiceSettings();
+      setClauses(res.clauses.map((c) => c.clause_text));
+      setVerse(res.scripture_verse);
+      setLicenseText(res.license_line);
+    } catch (e: unknown) {
+      setContentError(getErrorMessage(e) || "Failed to load invoice content");
+    } finally {
+      setContentLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!getAuth()) { router.replace("/manager"); return; }
+    loadSettings();
+    loadContent();
+  }, [router]);
+
+  // ── Old doctype save ──────────────────────────────────────────────────────
 
   const handleSave = async () => {
     if (!settings) return;
@@ -82,6 +121,55 @@ export default function InvoiceSettingsPage() {
     setSettings({ ...settings, [field]: value });
   };
 
+  // ── Forge content save ────────────────────────────────────────────────────
+
+  const handleSaveContent = async () => {
+    setContentSaving(true);
+    setContentError("");
+    setContentSuccess("");
+    setPermissionDenied(false);
+    try {
+      await updateInvoiceSettings(clauses, verse, licenseText);
+      setContentSuccess("Invoice content saved");
+      setTimeout(() => setContentSuccess(""), 3000);
+    } catch (e: unknown) {
+      const msg = getErrorMessage(e);
+      if (msg.includes("(403)") || msg.toLowerCase().includes("permissionerror")) {
+        setPermissionDenied(true);
+      } else {
+        setContentError(msg || "Save failed");
+      }
+    } finally {
+      setContentSaving(false);
+    }
+  };
+
+  // ── Clause list helpers ───────────────────────────────────────────────────
+
+  const updateClause = (i: number, text: string) => {
+    const next = [...clauses];
+    next[i] = text;
+    setClauses(next);
+  };
+
+  const moveClause = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= clauses.length) return;
+    const next = [...clauses];
+    [next[i], next[j]] = [next[j], next[i]];
+    setClauses(next);
+  };
+
+  const removeClause = (i: number) => {
+    setClauses(clauses.filter((_, idx) => idx !== i));
+  };
+
+  const addClause = () => {
+    setClauses([...clauses, ""]);
+  };
+
+  // ── Loading state ─────────────────────────────────────────────────────────
+
   if (!settings) {
     return (
       <>
@@ -93,15 +181,32 @@ export default function InvoiceSettingsPage() {
     );
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <>
       <NavBar />
       <div className="min-h-screen bg-navy p-4 sm:p-6">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-serif font-bold text-cream mb-6">Invoice Settings</h1>
 
-          {error && <div className="bg-red-900/30 border border-red-500 text-red-300 p-3 rounded-lg mb-4 text-sm">{error}</div>}
-          {success && <div className="bg-green-900/30 border border-green-500 text-green-300 p-3 rounded-lg mb-4 text-sm">{success}</div>}
+          {/* ── Breadcrumb ── */}
+          <p className="text-xs uppercase tracking-widest text-gold mb-2">Admin</p>
+          <h1 className="text-2xl font-serif font-extrabold text-cream mb-1">Invoice Settings</h1>
+          <p className="text-neutral-400 text-sm mb-6">
+            Pricing defaults and payment configuration for AllTec invoices.
+          </p>
+
+          {/* ── Old doctype feedback ── */}
+          {error && (
+            <div className="bg-red-950/40 border border-red-900/60 rounded-lg px-4 py-3 text-sm text-red-300 mb-6">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="bg-emerald-950/40 border border-emerald-900/60 rounded-lg px-4 py-3 text-sm text-emerald-300 mb-6">
+              {success}
+            </div>
+          )}
 
           {/* Pricing */}
           <Section title="Pricing">
@@ -117,8 +222,8 @@ export default function InvoiceSettingsPage() {
             <TextArea label="Terms Text" value={settings.payment_terms_text} onChange={(v) => update("payment_terms_text", v)} />
           </Section>
 
-          {/* Clauses */}
-          <Section title="Invoice Clauses">
+          {/* Static Clauses (legacy) */}
+          <Section title="Legacy Invoice Clauses">
             {[1, 2, 3].map((i) => (
               <div key={i} className="mb-4 pl-3 border-l-2 border-gold-dark/30">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic docfield access */}
@@ -138,26 +243,162 @@ export default function InvoiceSettingsPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="w-full bg-gradient-to-br from-gold to-gold-dark text-navy font-bold py-3 rounded-xl disabled:opacity-50 mt-2"
+            className="w-full bg-gradient-to-br from-gold to-gold-dark text-navy font-bold py-3 rounded-xl disabled:opacity-50 mt-2 mb-12"
           >
             {saving ? "Saving..." : "Save Settings"}
           </button>
+
+          {/* ── Divider ─────────────────────────────────────────────────── */}
+          <div className="border-t border-navy-border mb-8" />
+
+          {/* ── Invoice Content (Forge API) ──────────────────────────────── */}
+          <p className="text-xs uppercase tracking-widest text-gold mb-2">Invoice Content</p>
+          <h2 className="text-xl font-serif font-bold text-cream mb-1">Body Clauses &amp; Footer</h2>
+          <p className="text-neutral-400 text-sm mb-6">
+            Dynamic clause list, scripture verse, and license line printed on every AllTec invoice.
+            Office role required to save (System Manager, Accounts Manager, or MTM Office).
+          </p>
+
+          {/* Content feedback */}
+          {permissionDenied && (
+            <div className="bg-amber-950/40 border border-amber-800/60 rounded-lg px-4 py-3 text-sm text-amber-300 mb-6">
+              You don&apos;t have permission to edit invoice content. An office role is required
+              (System Manager, Accounts Manager, or MTM Office).
+            </div>
+          )}
+          {contentError && (
+            <div className="bg-red-950/40 border border-red-900/60 rounded-lg px-4 py-3 text-sm text-red-300 mb-6">
+              {contentError}
+            </div>
+          )}
+          {contentSuccess && (
+            <div className="bg-emerald-950/40 border border-emerald-900/60 rounded-lg px-4 py-3 text-sm text-emerald-300 mb-6">
+              {contentSuccess}
+            </div>
+          )}
+
+          {contentLoading ? (
+            <div className="bg-navy-surface border border-navy-border rounded-xl p-6 text-center">
+              <p className="text-neutral-500 text-sm">Loading invoice content…</p>
+            </div>
+          ) : (
+            <>
+              {/* ── Clauses ── */}
+              <Section title="Body Clauses">
+                {clauses.length === 0 && (
+                  <p className="text-neutral-500 text-sm mb-3">No clauses yet. Add one below.</p>
+                )}
+                {clauses.map((text, i) => (
+                  <div
+                    key={i}
+                    className="mb-4 bg-navy border border-navy-border rounded-lg p-3"
+                  >
+                    <div className="flex items-center gap-1 mb-2">
+                      <span className="text-[10px] uppercase tracking-wider text-neutral-500 flex-1">
+                        Clause {i + 1}
+                      </span>
+                      {/* Reorder */}
+                      <button
+                        type="button"
+                        aria-label="Move clause up"
+                        onClick={() => moveClause(i, -1)}
+                        disabled={i === 0}
+                        className="px-2 py-0.5 text-xs text-neutral-400 hover:text-cream disabled:opacity-30 disabled:cursor-not-allowed transition"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Move clause down"
+                        onClick={() => moveClause(i, 1)}
+                        disabled={i === clauses.length - 1}
+                        className="px-2 py-0.5 text-xs text-neutral-400 hover:text-cream disabled:opacity-30 disabled:cursor-not-allowed transition"
+                      >
+                        ▼
+                      </button>
+                      {/* Remove */}
+                      <button
+                        type="button"
+                        aria-label="Remove clause"
+                        onClick={() => removeClause(i)}
+                        className="px-2 py-0.5 text-xs text-red-400 hover:text-red-300 transition"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <textarea
+                      value={text}
+                      onChange={(e) => updateClause(i, e.target.value)}
+                      rows={3}
+                      placeholder="Enter clause text…"
+                      className="w-full bg-navy-surface border border-navy-border rounded-lg px-3 py-2 text-cream text-sm focus:border-gold-dark focus:outline-none resize-none"
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addClause}
+                  className="w-full border border-dashed border-navy-border rounded-lg py-2.5 text-sm text-neutral-400 hover:text-cream hover:border-gold-dark/50 transition"
+                >
+                  + Add Clause
+                </button>
+              </Section>
+
+              {/* ── Scripture Verse ── */}
+              <Section title="Scripture Verse">
+                <TextArea
+                  label="Verse text (printed at bottom of invoice)"
+                  value={verse}
+                  onChange={setVerse}
+                />
+              </Section>
+
+              {/* ── License Line ── */}
+              <Section title="License Line">
+                <Row
+                  label="License line (e.g. Licensed &amp; Insured · Lic# 123456)"
+                  value={licenseText}
+                  onChange={setLicenseText}
+                />
+              </Section>
+
+              <button
+                onClick={handleSaveContent}
+                disabled={contentSaving}
+                className="w-full bg-gradient-to-br from-gold to-gold-dark text-navy font-bold py-3 rounded-xl disabled:opacity-50 mt-2 mb-8"
+              >
+                {contentSaving ? "Saving…" : "Save Invoice Content"}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </>
   );
 }
 
+// ── Sub-components ────────────────────────────────────────────────────────────
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-navy-surface border border-navy-border rounded-xl p-4 mb-4">
-      <h2 className="text-xs uppercase tracking-wider text-neutral-400 font-bold mb-3">{title}</h2>
+      <h3 className="text-xs uppercase tracking-wider text-neutral-400 font-bold mb-3">{title}</h3>
       {children}
     </div>
   );
 }
 
-function Row({ label, value, onChange, type = "text" }: { label: string; value: string | number; onChange: (v: string) => void; type?: string }) {
+function Row({
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  label: string;
+  value: string | number;
+  onChange: (v: string) => void;
+  type?: string;
+}) {
   return (
     <div className="mb-3">
       <label className="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1">{label}</label>
@@ -171,7 +412,15 @@ function Row({ label, value, onChange, type = "text" }: { label: string; value: 
   );
 }
 
-function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function TextArea({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div className="mb-3">
       <label className="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1">{label}</label>

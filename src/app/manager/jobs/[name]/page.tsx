@@ -27,7 +27,7 @@ import {
   updateMaterialRate,
   getJobChecklist,
   updateChecklistItem,
-  getInvoiceSettings,
+  getInvoiceFees,
   uploadRawFile,
   uploadAndClassifyPhoto,
   syncHcpJob,
@@ -298,7 +298,7 @@ export default function JobDetailPage() {
     // Fetch card processing pct once per page load
     if (!settingsFetched.current) {
       settingsFetched.current = true;
-      getInvoiceSettings()
+      getInvoiceFees()
         .then((s) => setCardProcessingPct(s.card_processing_pct))
         .catch(() => {/* use default 2.7 */});
     }

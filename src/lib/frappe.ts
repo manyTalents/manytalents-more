@@ -1196,7 +1196,7 @@ export async function sendReceiptSms(
   });
 }
 
-export interface InvoiceSettings {
+export interface InvoiceFees {
   card_processing_pct: number;
   default_labor_rate: number;
 }
@@ -1451,7 +1451,7 @@ export async function getLinkedReceipts(
 }
 
 /** Fetch MTM Invoice Settings (single doctype) — needed for card fee %. */
-export async function getInvoiceSettings(): Promise<InvoiceSettings> {
+export async function getInvoiceFees(): Promise<InvoiceFees> {
   // MTM Invoice Settings is a Single doctype — read via the document API
   const res = await fetch(
     `${(getAuth()?.siteUrl || "https://erp.manytalentsmore.com").replace(/\/+$/, "")}/api/resource/MTM Invoice Settings/MTM Invoice Settings`,
@@ -1477,4 +1477,44 @@ export async function getInvoiceSettings(): Promise<InvoiceSettings> {
     card_processing_pct: json.data?.card_processing_pct ?? 2.7,
     default_labor_rate: json.data?.default_labor_rate ?? 155,
   };
+}
+
+// ── Invoice Content: Clauses / Scripture Verse / License Line ────────────────
+
+const INVOICE_SETTINGS_API = "hcp_replacement.hcp_replacement.api.invoice_settings";
+
+export interface InvoiceClause {
+  clause_text: string;
+}
+
+export interface InvoiceSettingsContent {
+  clauses: InvoiceClause[];
+  scripture_verse: string;
+  license_line: string;
+}
+
+/**
+ * Fetch invoice body clauses, scripture verse, and license line.
+ * Endpoint: hcp_replacement.hcp_replacement.api.invoice_settings.get_invoice_settings
+ */
+export async function getInvoiceSettings(): Promise<InvoiceSettingsContent> {
+  return callMethod<InvoiceSettingsContent>(`${INVOICE_SETTINGS_API}.get_invoice_settings`);
+}
+
+/**
+ * Replace invoice body clauses, scripture verse, and license line (whole-list replace).
+ * Requires office role (System Manager / Accounts Manager / MTM Office).
+ * Returns HTTP 403 / PermissionError if the caller lacks the required role.
+ * Endpoint: hcp_replacement.hcp_replacement.api.invoice_settings.update_invoice_settings
+ */
+export async function updateInvoiceSettings(
+  clauses: string[],
+  scripture_verse: string,
+  license_line: string
+): Promise<void> {
+  await callMethod<void>(`${INVOICE_SETTINGS_API}.update_invoice_settings`, {
+    clauses: JSON.stringify(clauses),
+    scripture_verse,
+    license_line,
+  });
 }
