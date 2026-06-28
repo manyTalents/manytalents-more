@@ -1049,6 +1049,21 @@ export async function getJobChecklist(jobName: string): Promise<{
   return callMethod("hcp_replacement.hcp_replacement.api.checklists.get_job_checklist", { job_name: jobName });
 }
 
+/** Toggle a single checklist item on or off. Mirrors the mobile FinishJobChecklist behaviour. */
+export async function updateChecklistItem(
+  jobName: string,
+  itemIdx: number,
+  checked: boolean,
+  changeReason?: string
+): Promise<void> {
+  await callMethod("hcp_replacement.hcp_replacement.api.checklists.update_checklist_item", {
+    job_name: jobName,
+    item_idx: itemIdx,
+    checked: checked ? 1 : 0,
+    ...(changeReason ? { change_reason: changeReason } : {}),
+  });
+}
+
 // ── Payments ──────────────────────────────────────────────────────────────────
 
 const INVOICE_API = "hcp_replacement.hcp_replacement.api.invoice";
