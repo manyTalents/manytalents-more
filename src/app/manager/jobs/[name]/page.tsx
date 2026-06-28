@@ -50,6 +50,9 @@ import JobReceiptsModal from "@/app/manager/components/JobReceiptsModal";
 import { getErrorMessage } from "@/lib/errors";
 import { useInvoicedEditGuard } from "./useInvoicedEditGuard";
 
+type ChecklistItem = { idx: number; item_text: string; required: number; checked: number; checked_at: string | null; checked_by: string | null };
+type ChecklistData = { job_name: string; populated_from_template: boolean; items: ChecklistItem[] };
+
 const STATUS_COLORS: Record<string, string> = {
   Entered: "bg-neutral-700 text-neutral-300",
   Scheduled: "bg-blue-900/60 text-blue-300",
@@ -216,8 +219,7 @@ export default function JobDetailPage() {
   const [addingCustomPart, setAddingCustomPart] = useState(false);
 
   // Checklist (editable audit view)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Frappe API response shape
-  const [checklist, setChecklist] = useState<any>(null);
+  const [checklist, setChecklist] = useState<ChecklistData | null>(null);
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistError, setChecklistError] = useState("");
   const [checklistVisible, setChecklistVisible] = useState(false);
@@ -577,11 +579,11 @@ export default function JobDetailPage() {
       // Mark in-flight
       setChecklistToggling((prev) => { const s = new Set(prev); s.add(itemIdx); return s; });
       // Optimistic update
-      setChecklist((prev: any) => {
+      setChecklist((prev: ChecklistData | null) => {
         if (!prev) return prev;
         return {
           ...prev,
-          items: prev.items.map((i: any) =>
+          items: prev.items.map((i) =>
             i.idx === itemIdx ? { ...i, checked: nowChecked ? 1 : 0 } : i
           ),
         };
@@ -592,11 +594,11 @@ export default function JobDetailPage() {
         getJobChecklist(jobName).then((data) => setChecklist(data)).catch(() => {});
       } catch (err: unknown) {
         // Revert optimistic update on failure
-        setChecklist((prev: any) => {
+        setChecklist((prev: ChecklistData | null) => {
           if (!prev) return prev;
           return {
             ...prev,
-            items: prev.items.map((i: any) =>
+            items: prev.items.map((i) =>
               i.idx === itemIdx ? { ...i, checked: nowChecked ? 0 : 1 } : i
             ),
           };
