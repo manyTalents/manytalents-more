@@ -66,3 +66,34 @@ Connect VEOE (options trading) and Crypto Bot dashboards to manytalentsmore.com 
 5. End-to-end smoke test
 
 All infrastructure instructions are in `Team Inbox/money-api-infra/`.
+
+---
+
+## Session 2026-06-28 — Web Office Parity Monday Deploy (Glass)
+
+### Context
+Owner authorized RED deploy of staged `feat/web-office-parity-monday` branch (commit 46c905a), built earlier in session.
+
+### What Shipped
+- **P1-3 Labor Description Edit** — inline card on job page; Edit/Save/Cancel identical to Services pattern; `saveJobField` API; `useInvoicedEditGuard` enforced; always visible so office can add description to any job.
+- **P1-4 Completion Checklist Toggle** — each item is a `<button>`; calls `updateChecklistItem` (frappe.ts export); optimistic update + background checklist refresh for checked_by/checked_at; per-item loading indicator.
+- **82fb11a** (also merged): job note editing + Schedule action for Assigned status (prior fix).
+
+### Build Notes
+- Build attempt in temp dir surfaced `react-is` missing peer dep (was in OneDrive node_modules but not hoisted in clean install). Added `react-is` to temp dir. Not a production issue — Vercel uses its own install.
+- ESLint error in `any` callbacks in our new handleChecklistToggle — added proper `ChecklistData` / `ChecklistItem` types, removed all 4 `any` annotations. Required 1 additional commit (ab0eb87).
+- Final tsc: 0 errors. Build: 44 pages, green.
+
+### Commits
+| Hash | Description |
+|------|-------------|
+| 82fb11a | fix: job note editing + Schedule action for Assigned |
+| 46c905a | feat(web-parity): labor description + checklist toggle |
+| cf05aaa | merge(feat/web-office-parity-monday): Owner-approved RED |
+| ab0eb87 | fix(lint): type ChecklistData — remove any annotations |
+
+### Deployment
+- Push: e8103d2..ab0eb87 → origin/master at 20:59 UTC
+- Vercel status: `success` — "Deployment has completed" at 21:00:57 UTC (1 min 12s)
+- Deploy URL: https://manytalents-more-a63iim7ia-manytalents-projects.vercel.app
+- Vercel dashboard: https://vercel.com/manytalents-projects/manytalents-more/FpAsV4TbBFmvUuCNstHTfDnJX4Rr
